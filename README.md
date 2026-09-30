@@ -10,10 +10,10 @@ Master profile → Job discovery → JD analysis → Semantic matching → Skill
   → HUMAN APPROVAL → Browser-assisted application (stops before submit) → Tracking
 ```
 
-> **Status: Job analysis.** Master profile and dashboard (`/profile`), resume upload with
-> reviewed extraction, semantic search over verified evidence, and job description analysis
-> (`/jobs`: paste, URL reference, or manual entry). No job discovery or matching yet. See
-> [docs/job-analysis.md](docs/job-analysis.md),
+> **Status: Job matching.** Master profile (`/profile`), resume upload with reviewed
+> extraction, verified-evidence search, job description analysis (`/jobs`), and explainable
+> candidate-job matching (`/jobs/[id]/match`). No job discovery or document generation yet.
+> See [docs/matching.md](docs/matching.md), [docs/job-analysis.md](docs/job-analysis.md),
 > [docs/evidence-retrieval.md](docs/evidence-retrieval.md),
 > [docs/resume-ingestion.md](docs/resume-ingestion.md), [docs/profile.md](docs/profile.md),
 > and [docs/database.md](docs/database.md).

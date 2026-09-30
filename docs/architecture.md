@@ -188,6 +188,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 2     | Resume ingestion: PDF/DOCX, grounded extraction, review (**done**)    |
 | 3a    | Evidence RAG: embeddings, pgvector search, verified-only retrieval (**done**) |
 | 3b    | Job description analysis: structured extraction, no inference (**done**) |
+| 4     | Candidate-job matching: grounded, explainable evidence coverage (**done**) |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

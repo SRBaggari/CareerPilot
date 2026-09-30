@@ -13,17 +13,21 @@ APPEND_ONLY_TABLES = {
     "ai_execution_logs",
     "generated_claim_evidence",
 }
-ASSOCIATION_TABLES = {"candidate_evidence_skills", "generated_claim_evidence"}
+ASSOCIATION_TABLES = {
+    "candidate_evidence_skills",
+    "generated_claim_evidence",
+    "requirement_match_evidence",
+}
 
 
 def test_all_expected_tables_are_registered() -> None:
-    # 25 core tables + profile_suggestions + association tables
-    assert len(Base.metadata.tables) == 26 + len(ASSOCIATION_TABLES)
+    # 25 core tables + profile_suggestions + requirement_matches + association tables
+    assert len(Base.metadata.tables) == 27 + len(ASSOCIATION_TABLES)
 
 
 def test_timestamps() -> None:
     for name, table in Base.metadata.tables.items():
-        if name == "candidate_evidence_skills":
+        if name in ("candidate_evidence_skills", "requirement_match_evidence"):
             continue
         assert "created_at" in table.c, name
         assert ("updated_at" in table.c) == (name not in APPEND_ONLY_TABLES), name

@@ -54,7 +54,7 @@ TYPE_LABELS = {
 # --- Helpers --------------------------------------------------------------------------
 
 
-def _with_sources[Q: Select[Any]](query: Q) -> Q:
+def with_sources[Q: Select[Any]](query: Q) -> Q:
     """Eager-load everything ``record_label``/``_source`` read (no lazy loads in async)."""
     return query.options(
         selectinload(CandidateEvidence.project),
@@ -103,7 +103,7 @@ def confidence_for(similarity: float, thresholds: tuple[float, float]) -> Confid
     return "medium" if similarity >= medium else "low"
 
 
-def _source(evidence: CandidateEvidence) -> EvidenceSource:
+def evidence_source(evidence: CandidateEvidence) -> EvidenceSource:
     column = EVIDENCE_SUBJECT_COLUMNS.get(evidence.source_type)
     return EvidenceSource(
         record_type=evidence.source_type,
@@ -159,7 +159,7 @@ async def index_evidence(
                 CandidateEvidence.embedding_model.is_distinct_from(provider.model),
             )
         )
-    pending = list(await session.scalars(_with_sources(query.order_by(CandidateEvidence.id))))
+    pending = list(await session.scalars(with_sources(query.order_by(CandidateEvidence.id))))
     for start in range(0, len(pending), EMBED_BATCH):
         batch = pending[start : start + EMBED_BATCH]
         vectors = await _embed(provider, [chunk_text(e) for e in batch], "document")
@@ -181,20 +181,17 @@ async def index_evidence(
 # --- Retrieval ------------------------------------------------------------------------
 
 
-async def search_evidence(
+async def _nearest(
     session: AsyncSession,
     candidate_id: uuid.UUID,
-    query: str,
+    query_vector: list[float],
     provider: EmbeddingProvider,
     *,
-    top_k: int = 5,
+    top_k: int,
     evidence_types: Sequence[EvidenceSourceType] | None = None,
     include_unverified: bool = False,
     min_similarity: float | None = None,
-) -> EvidenceSearchOut:
-    indexed = await index_evidence(session, candidate_id, provider)
-    [query_vector] = await _embed(provider, [query], "query")
-
+) -> list[RetrievedEvidence]:
     distance = CandidateEvidence.embedding.cosine_distance(query_vector)
     stmt = (
         select(CandidateEvidence, distance.label("distance"))
@@ -215,9 +212,8 @@ async def search_evidence(
     if min_similarity is not None:
         stmt = stmt.where(distance <= 1 - min_similarity)
 
-    rows = (await session.execute(_with_sources(stmt))).all()
     results = []
-    for evidence, dist in rows:
+    for evidence, dist in (await session.execute(with_sources(stmt))).all():
         similarity = round(1 - float(dist), 4)
         results.append(
             RetrievedEvidence(
@@ -228,11 +224,32 @@ async def search_evidence(
                 similarity=similarity,
                 confidence=confidence_for(similarity, provider.confidence_thresholds),
                 verification_status=evidence.verification_status,
-                source=_source(evidence),
+                source=evidence_source(evidence),
                 created_at=evidence.created_at,
                 updated_at=evidence.updated_at,
             )
         )
+    return results
+
+
+async def search_evidence(
+    session: AsyncSession,
+    candidate_id: uuid.UUID,
+    query: str,
+    provider: EmbeddingProvider,
+    *,
+    top_k: int = 5,
+    evidence_types: Sequence[EvidenceSourceType] | None = None,
+    include_unverified: bool = False,
+    min_similarity: float | None = None,
+) -> EvidenceSearchOut:
+    indexed = await index_evidence(session, candidate_id, provider)
+    [query_vector] = await _embed(provider, [query], "query")
+    results = await _nearest(
+        session, candidate_id, query_vector, provider, top_k=top_k,
+        evidence_types=evidence_types, include_unverified=include_unverified,
+        min_similarity=min_similarity,
+    )  # fmt: skip
     return EvidenceSearchOut(
         candidate_id=candidate_id,
         query=query,
@@ -242,6 +259,27 @@ async def search_evidence(
         newly_indexed=indexed.indexed,
         results=results,
     )
+
+
+async def retrieve_verified_for_queries(
+    session: AsyncSession,
+    candidate_id: uuid.UUID,
+    queries: Sequence[str],
+    provider: EmbeddingProvider,
+    *,
+    top_k: int = 5,
+) -> list[list[RetrievedEvidence]]:
+    """Verified evidence for several queries, embedding all queries in one call.
+
+    Like ``retrieve_verified_evidence``, it has no way to return unverified evidence.
+    """
+    if not queries:
+        return []
+    await index_evidence(session, candidate_id, provider)
+    vectors = await _embed(provider, list(queries), "query")
+    return [
+        await _nearest(session, candidate_id, vector, provider, top_k=top_k) for vector in vectors
+    ]
 
 
 async def retrieve_verified_evidence(

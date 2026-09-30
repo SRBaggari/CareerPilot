@@ -12,7 +12,7 @@ from app.documents.models import (
     generated_claim_evidence,
 )
 from app.jobs.models import Job, JobRequirement
-from app.matching.models import JobMatch, SkillGap
+from app.matching.models import JobMatch, RequirementMatch, SkillGap, requirement_match_evidence
 from app.profiles.models import (
     Achievement,
     CandidateEvidence,
@@ -50,6 +50,7 @@ __all__ = [
     "JobMatch",
     "JobRequirement",
     "Project",
+    "RequirementMatch",
     "Resume",
     "Skill",
     "SkillGap",
@@ -58,4 +59,5 @@ __all__ = [
     "WorkExperience",
     "candidate_evidence_skills",
     "generated_claim_evidence",
+    "requirement_match_evidence",
 ]

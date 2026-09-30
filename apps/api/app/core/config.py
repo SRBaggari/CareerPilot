@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     resume_parser: Literal["auto", "heuristic", "llm"] = "auto"
     # Job description analysis: same choice as the resume parser.
     job_analyzer: Literal["auto", "heuristic", "llm"] = "auto"
+    # Candidate-job matching judge: rules only, or an LLM grounded against retrieved evidence.
+    match_judge: Literal["auto", "rules", "llm"] = "auto"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

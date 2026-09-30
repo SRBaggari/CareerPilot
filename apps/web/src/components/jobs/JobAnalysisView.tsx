@@ -165,9 +165,17 @@ export function JobAnalysisView({ jobId }: { jobId: string }) {
           </h1>
           <p className="text-zinc-600 dark:text-zinc-400">{job.company_name}</p>
         </div>
-        <Button variant="danger" onClick={() => void remove()}>
-          Delete job
-        </Button>
+        <div className="flex gap-2">
+          <Link
+            href={`/jobs/${job.id}/match`}
+            className="inline-flex items-center rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            Compare with my profile
+          </Link>
+          <Button variant="danger" onClick={() => void remove()}>
+            Delete job
+          </Button>
+        </div>
       </div>
 
       {job.analysis_warnings.length > 0 ? (

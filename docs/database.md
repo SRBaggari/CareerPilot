@@ -1,7 +1,7 @@
 # CareerPilot Database Schema
 
 PostgreSQL 16+ with the `pgvector` extension. Models live in `apps/api/app/<domain>/models.py`;
-migrations in `apps/api/migrations/versions/`. This document describes revision `0006` (job analysis columns: see [job-analysis.md](job-analysis.md)).
+migrations in `apps/api/migrations/versions/`. This document describes revision `0007` (job analysis: [job-analysis.md](job-analysis.md); matching: [matching.md](matching.md)).
 
 ## 1. Core principle: evidence is the source of truth
 
