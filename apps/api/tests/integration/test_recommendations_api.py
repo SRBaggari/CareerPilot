@@ -194,7 +194,7 @@ async def test_analyze_imports_the_job_once(api: httpx2.AsyncClient, db: AsyncSe
     assert resume.status_code == 201, resume.text
 
 
-async def test_start_application_creates_a_draft_only(
+async def test_start_application_tracks_it_without_submitting(
     api: httpx2.AsyncClient, db: AsyncSession
 ) -> None:
     await build_profile(api)
@@ -202,13 +202,14 @@ async def test_start_application_creates_a_draft_only(
     result = (await api.post(f"{RECS}/{ml['id']}/start-application")).json()
     assert result["application_id"] and result["job_id"]
     rec = result["recommendation"]
-    assert rec["application"] == {"id": result["application_id"], "status": "draft"}
+    assert rec["application"] == {"id": result["application_id"], "status": "analyzed"}
     assert rec["status"] == "saved"
     application = await db.scalar(
         select(Application).where(Application.id == result["application_id"])
     )
     assert application is not None
-    assert application.status == "draft" and application.approved_at is None
+    assert application.status == "analyzed" and application.approved_at is None
+    assert application.discovered_at is not None
     assert application.submitted_at is None
     again = (await api.post(f"{RECS}/{ml['id']}/start-application")).json()
     assert again["application_id"] == result["application_id"]

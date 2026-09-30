@@ -78,10 +78,10 @@ fingerprint).
 | **Ignore Job** / Restore | `POST …/{id}/ignore`, `…/restore` | Hidden from recommendations and not recomputed on later refreshes, until restored |
 | **Analyze Job** | `POST …/{id}/analyze` | Imports the posting as a job, from the stored snapshot, with the same full analysis as a pasted description, then opens its match report |
 | **Tailor Resume** | `POST …/{id}/analyze` | Imports the job if needed, then opens its tailored resume page |
-| **Start Application** | `POST …/{id}/start-application` | Imports the job if needed and creates a **draft** application, with a status-history entry "Started from a job recommendation". The job is also saved. |
+| **Start Application** | `POST …/{id}/start-application` | Imports the job if needed and starts tracking it in the [application tracker](application-tracker.md) (status: analyzed), with a status-history entry "Started from a job recommendation". The job is also saved. |
 
-Starting an application doesn't approve or submit anything: approval and submission remain
-explicit, separate steps. A job with an application can't be deleted.
+Starting an application doesn't approve or submit anything: approval and recording the
+submission remain explicit, separate steps in the tracker. A job with an application can't be deleted.
 
 ## Storage
 
@@ -113,7 +113,7 @@ saved, ignored or analyzed them.
   - an empty profile;
   - save, ignore and restore across refreshes;
   - analyze, then tailor with the unchanged resume pipeline;
-  - start application: a draft only, never approved or submitted;
+  - start application: tracked only, never approved or submitted;
   - stale flags, failing sources, and privacy.
 - `apps/web/src/components/recommendations/recommendations.test.tsx`:
   - the card's explanation sections;
@@ -121,4 +121,4 @@ saved, ignored or analyzed them.
   - the views and filtered-out reasons;
   - save and ignore;
   - analyze and tailor navigation;
-  - a draft application.
+  - starting to track an application.

@@ -151,7 +151,9 @@ to that evidence verbatim; everything else unsupported is rejected and audited. 
 ## 6. Human-in-the-loop and automation safety _(approval guard implemented; automation planned)_
 
 - Applications move through explicit states:
-  `draft → ready_for_review → approved → filling → awaiting_submission → submitted`.
+  `discovered → saved → analyzed → application_prepared → awaiting_approval → submitted →
+  assessment → interview → offer` (or rejected / withdrawn); see
+  [application-tracker.md](application-tracker.md).
   Only a user action can move an application to `approved` or `submitted`. The database
   already rejects any post-approval status without `approved_at`, and any `submitted_at`
   earlier than `approved_at` (see database.md, section "Applications").
@@ -208,6 +210,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 5d    | Application answers: understand, retrieve, answer, verify, edit, approve (**done**) |
 | 6a    | Job discovery: provider adapters, access rules, mock source, filters, import (**done**) |
 | 6b    | Recommendations: discovery → analysis → evidence → matching → eligibility, explained (**done**) |
+| 6c    | Application tracker: lifecycle with approval gate, board, timeline, reminders (**done**) |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

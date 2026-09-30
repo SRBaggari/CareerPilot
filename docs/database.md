@@ -1,7 +1,7 @@
 # CareerPilot Database Schema
 
 PostgreSQL 16+ with the `pgvector` extension. Models live in `apps/api/app/<domain>/models.py`;
-migrations in `apps/api/migrations/versions/`. This document describes revision `0013` (job analysis: [job-analysis.md](job-analysis.md); matching: [matching.md](matching.md); resume tailoring: [resume-tailoring.md](resume-tailoring.md); claim verification: [claim-verification.md](claim-verification.md); cover letters: [cover-letters.md](cover-letters.md); application answers: [application-answers.md](application-answers.md); job discovery: [job-discovery.md](job-discovery.md); recommendations: [recommendations.md](recommendations.md)).
+migrations in `apps/api/migrations/versions/`. This document describes revision `0014` (job analysis: [job-analysis.md](job-analysis.md); matching: [matching.md](matching.md); resume tailoring: [resume-tailoring.md](resume-tailoring.md); claim verification: [claim-verification.md](claim-verification.md); cover letters: [cover-letters.md](cover-letters.md); application answers: [application-answers.md](application-answers.md); job discovery: [job-discovery.md](job-discovery.md); recommendations: [recommendations.md](recommendations.md); application tracker: [application-tracker.md](application-tracker.md)).
 
 ## 1. Core principle: evidence is the source of truth
 
@@ -173,28 +173,29 @@ Document `status`: `draft → verified | verification_failed → approved → ar
 
 | Table | Purpose | Notable columns and constraints |
 | --- | --- | --- |
-| `applications` | One per (candidate, job) | `status`, `approved_at`, `submitted_at`, attached `tailored_resume_id` / `cover_letter_id` (cannot be deleted while attached) |
+| `applications` | One per (candidate, job) | `status` (lifecycle below), `discovered_at`, `approved_at`, `submitted_at` (date applied), `application_url`, `notes`, attached `tailored_resume_id` / `cover_letter_id` (cannot be deleted while attached; kept when a document is regenerated) |
 | `application_status_history` | Append-only transition log | `from_status`, `to_status`, `actor` (user/system/automation) |
 | `interviews` | Scheduled and past interviews | `interview_type`, `status`, `duration_minutes > 0` |
 | `follow_ups` | Reminders for the candidate (never sent automatically) | `channel`, `status`, `done` requires `completed_at` |
 
-Application `status` flow:
+Application `status` flow (see [application-tracker.md](application-tracker.md)):
 
 ```
-draft → ready_for_review → approved → filling → awaiting_submission → submitted
-                                                                       → interviewing → offer → accepted
-                                                          (any)        → rejected / withdrawn
+discovered → saved → analyzed → application_prepared → awaiting_approval
+    → (candidate approval) → submitted → assessment → interview → offer
+(any) → rejected / withdrawn
 ```
 
 **Human approval is enforced by the database:**
 
-- `ck_applications_approval_required`: statuses `approved`, `filling`, `awaiting_submission`,
-  `submitted`, `interviewing`, `offer`, `accepted`, `rejected` require `approved_at`.
+- `ck_applications_approval_required`: `submitted`, `assessment`, `interview` and `offer`
+  require `approved_at`.
+- `ck_applications_submitted_has_time`: the same statuses require `submitted_at`.
 - `ck_applications_submitted_after_approval`: `submitted_at` requires `approved_at`, and
   `submitted_at ≥ approved_at`.
-- `ck_applications_submitted_has_time`: `submitted` requires `submitted_at`.
 
-Only `draft`, `ready_for_review` and `withdrawn` are allowed without approval.
+Every status before `submitted`, plus `rejected` and `withdrawn`, is allowed without
+approval. `discovered_at` records when the job was discovered.
 
 ### AI profile suggestions
 

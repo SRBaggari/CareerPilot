@@ -287,10 +287,10 @@ export function RecommendationCard({
         </Button>
         {rec.application ? (
           <Link
-            href={`/jobs/${rec.job_id}/questions`}
+            href={`/applications/${rec.application.id}`}
             className="inline-flex items-center rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
           >
-            Continue application (draft)
+            Open in tracker
           </Link>
         ) : (
           <Button
@@ -315,7 +315,8 @@ export function RecommendationCard({
       </div>
       {rec.application ? (
         <p className="text-xs text-zinc-500" role="status">
-          A draft application exists. Nothing is submitted until you review and approve it.
+          You&apos;re tracking this application. Nothing is submitted until you approve it and
+          submit it yourself.
         </p>
       ) : null}
     </article>

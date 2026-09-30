@@ -314,8 +314,8 @@ async def start_application(
     settings: Settings,
     llm: LLMProvider | None,
 ) -> ActionResultOut:
-    """Start a draft application for the job. Nothing is submitted: every later step needs
-    the candidate's explicit approval."""
+    """Start tracking an application for the job (status: analyzed). Nothing is submitted:
+    reaching "submitted" needs the candidate's explicit approval."""
     row = await _owned(session, user, rec_id)
     job_id = await _ensure_job(session, user, row, registry, settings, llm)
     row = await _owned(session, user, rec_id)
@@ -329,14 +329,15 @@ async def start_application(
         application = Application(
             candidate_profile_id=row.candidate_profile_id,
             job_id=job_id,
-            status=ApplicationStatus.DRAFT,
+            status=ApplicationStatus.ANALYZED,
+            discovered_at=row.created_at,
             application_url=row.posting.get("url"),
             notes="Started from a job recommendation. Nothing is submitted without your approval.",
         )
         application.status_history.append(
             ApplicationStatusHistory(
                 from_status=None,
-                to_status=ApplicationStatus.DRAFT,
+                to_status=ApplicationStatus.ANALYZED,
                 actor=StatusActor.USER,
                 note="Started from a job recommendation.",
             )

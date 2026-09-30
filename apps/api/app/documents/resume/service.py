@@ -20,6 +20,7 @@ from sqlalchemy.orm import selectinload
 from app.ai.embeddings import EmbeddingProvider
 from app.ai.models import AIExecutionLog, AIExecutionStatus, AIOperation
 from app.ai.provider import LLMError, LLMProvider
+from app.applications.models import Application
 from app.core.config import Settings
 from app.core.errors import ConflictError, FieldErrors, NotFoundError
 from app.documents.models import (
@@ -371,6 +372,10 @@ async def generate(
         delete(TailoredResume).where(
             TailoredResume.candidate_profile_id == profile.id, TailoredResume.job_id == job.id,
             TailoredResume.status != DocumentStatus.APPROVED,
+            # A version an application uses is kept (the application records what was sent).
+            TailoredResume.id.not_in(
+                select(Application.tailored_resume_id).where(Application.tailored_resume_id.is_not(None))
+            ),
         )
     )  # fmt: skip
     primary = await session.scalar(
@@ -533,5 +538,12 @@ async def delete_resume(session: AsyncSession, user: User, resume_id: uuid.UUID)
     resume = await _owned_resume(session, user, resume_id)
     if resume.status == DocumentStatus.APPROVED:
         raise ConflictError("Approved resumes can't be deleted.")
+    in_use = await session.scalar(
+        select(Application.id).where(Application.tailored_resume_id == resume.id).limit(1)
+    )
+    if in_use is not None:
+        raise ConflictError(
+            "This resume is attached to an application; detach it there before deleting it."
+        )
     await session.delete(resume)  # its claims, links, verifications and reports cascade
     await session.commit()

@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     application_answers,
+    applications,
     candidate_evidence,
     cover_letters,
     discovery,
@@ -28,3 +29,4 @@ api_router.include_router(cover_letters.router)
 api_router.include_router(application_answers.router)
 api_router.include_router(discovery.router)
 api_router.include_router(recommendations.router)
+api_router.include_router(applications.router)

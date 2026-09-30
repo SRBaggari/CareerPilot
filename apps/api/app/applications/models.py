@@ -1,8 +1,8 @@
 """Applications, their status history, interviews, and follow-ups.
 
 Human approval is enforced by the database, not only by application code: an application
-cannot reach any status at or beyond ``approved`` without ``approved_at``, and cannot be
-``submitted`` without ``submitted_at``.
+cannot reach ``submitted`` or any later stage (assessment, interview, offer) without
+``approved_at`` (the candidate's explicit approval) and ``submitted_at``.
 """
 
 from __future__ import annotations
@@ -27,29 +27,35 @@ from app.jobs.models import Job
 
 
 class ApplicationStatus(StrEnum):
-    DRAFT = "draft"
-    READY_FOR_REVIEW = "ready_for_review"
-    APPROVED = "approved"  # candidate explicitly approved; automation may start
-    FILLING = "filling"  # browser automation filling the form
-    AWAITING_SUBMISSION = "awaiting_submission"  # stopped before submit; candidate submits
-    SUBMITTED = "submitted"
-    INTERVIEWING = "interviewing"
+    """The application lifecycle, in order."""
+
+    DISCOVERED = "discovered"  # found (e.g. through job discovery)
+    SAVED = "saved"  # kept to consider
+    ANALYZED = "analyzed"  # requirements analyzed and matched
+    APPLICATION_PREPARED = "application_prepared"  # resume, cover letter, answers ready
+    AWAITING_APPROVAL = "awaiting_approval"  # waiting for the candidate's explicit approval
+    SUBMITTED = "submitted"  # the candidate submitted it (CareerPilot never submits)
+    ASSESSMENT = "assessment"  # a test or take-home
+    INTERVIEW = "interview"
     OFFER = "offer"
-    ACCEPTED = "accepted"
     REJECTED = "rejected"
     WITHDRAWN = "withdrawn"
 
 
-# Statuses that are only reachable after explicit human approval.
+# Statuses before submission, in lifecycle order.
+PRE_SUBMISSION: tuple[ApplicationStatus, ...] = (
+    ApplicationStatus.DISCOVERED,
+    ApplicationStatus.SAVED,
+    ApplicationStatus.ANALYZED,
+    ApplicationStatus.APPLICATION_PREPARED,
+    ApplicationStatus.AWAITING_APPROVAL,
+)
+# Statuses only reachable after the candidate explicitly approved AND submitted it.
 APPROVAL_REQUIRED_STATUSES: tuple[ApplicationStatus, ...] = (
-    ApplicationStatus.APPROVED,
-    ApplicationStatus.FILLING,
-    ApplicationStatus.AWAITING_SUBMISSION,
     ApplicationStatus.SUBMITTED,
-    ApplicationStatus.INTERVIEWING,
+    ApplicationStatus.ASSESSMENT,
+    ApplicationStatus.INTERVIEW,
     ApplicationStatus.OFFER,
-    ApplicationStatus.ACCEPTED,
-    ApplicationStatus.REJECTED,
 )
 _APPROVAL_REQUIRED_SQL = ", ".join(f"'{s.value}'" for s in APPROVAL_REQUIRED_STATUSES)
 
@@ -102,7 +108,10 @@ class Application(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             "submitted_at IS NULL OR (approved_at IS NOT NULL AND submitted_at >= approved_at)",
             "submitted_after_approval",
         ),
-        CheckConstraint("status <> 'submitted' OR submitted_at IS NOT NULL", "submitted_has_time"),
+        CheckConstraint(
+            f"status NOT IN ({_APPROVAL_REQUIRED_SQL}) OR submitted_at IS NOT NULL",
+            "submitted_has_time",
+        ),
         Index("ix_applications_profile_status", "candidate_profile_id", "status"),
     )
 
@@ -116,8 +125,9 @@ class Application(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         "cover_letters.id", ondelete=None, nullable=True
     )
     status: Mapped[ApplicationStatus] = enum_column(
-        ApplicationStatus, default=ApplicationStatus.DRAFT, server_default="draft"
+        ApplicationStatus, default=ApplicationStatus.SAVED, server_default="saved"
     )
+    discovered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     application_url: Mapped[str | None] = mapped_column(Text)

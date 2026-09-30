@@ -229,24 +229,23 @@ describe("RecommendationsPage", () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith("/jobs/job-9/resume"));
   });
 
-  it("starts a draft application without submitting anything", async () => {
+  it("starts tracking an application without submitting anything", async () => {
     stubApi({
       "GET /recommendations?view=recommended": () => ({ status: 200, body: makeList() }),
       "POST /recommendations/r1/start-application": () =>
         result(
-          { job_id: "job-9", status: "saved", application: { id: "a1", status: "draft" } },
+          { job_id: "job-9", status: "saved", application: { id: "a1", status: "analyzed" } },
           { application_id: "a1" },
         ),
     });
     render(<RecommendationsPage />);
     const card = await screen.findByRole("article", { name: "#1ML Engineer" });
     fireEvent.click(within(card).getByRole("button", { name: "Start Application" }));
-    expect(
-      await within(card).findByRole("link", { name: "Continue application (draft)" }),
-    ).toHaveAttribute("href", "/jobs/job-9/questions");
-    expect(
-      within(card).getByText(/Nothing is submitted until you review and approve it/),
-    ).toBeVisible();
-    expect(card).toHaveTextContent("Application: draft");
+    expect(await within(card).findByRole("link", { name: "Open in tracker" })).toHaveAttribute(
+      "href",
+      "/applications/a1",
+    );
+    expect(within(card).getByText(/Nothing is submitted until you approve it/)).toBeVisible();
+    expect(card).toHaveTextContent("Application: analyzed");
   });
 });

@@ -19,6 +19,7 @@ from sqlalchemy.orm import selectinload
 from app.ai.embeddings import EmbeddingProvider
 from app.ai.models import AIExecutionLog, AIExecutionStatus, AIOperation
 from app.ai.provider import LLMError, LLMProvider
+from app.applications.models import Application
 from app.core.config import Settings
 from app.core.errors import ConflictError, FieldErrors, NotFoundError
 from app.documents.cover_letter.content import CoverLetterContent, LetterParagraph, LetterSentence
@@ -292,6 +293,10 @@ async def generate(
         delete(CoverLetter).where(
             CoverLetter.candidate_profile_id == profile.id, CoverLetter.job_id == job.id,
             CoverLetter.status != DocumentStatus.APPROVED,
+            # A version an application uses is kept (the application records what was sent).
+            CoverLetter.id.not_in(
+                select(Application.cover_letter_id).where(Application.cover_letter_id.is_not(None))
+            ),
         )
     )  # fmt: skip
     letter = CoverLetter(
@@ -633,5 +638,12 @@ async def delete_letter(session: AsyncSession, user: User, letter_id: uuid.UUID)
     letter = await _owned_letter(session, user, letter_id)
     if letter.status == DocumentStatus.APPROVED:
         raise ConflictError("Approved cover letters can't be deleted.")
+    in_use = await session.scalar(
+        select(Application.id).where(Application.cover_letter_id == letter.id).limit(1)
+    )
+    if in_use is not None:
+        raise ConflictError(
+            "This cover letter is attached to an application; detach it there before deleting it."
+        )
     await session.delete(letter)
     await session.commit()

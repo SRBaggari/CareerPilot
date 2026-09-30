@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 
 import { Badge, Button, Card, EmptyState } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
+import { trackJob } from "@/lib/api/applications";
 import { deleteJob, getJob, type Job, type Requirement } from "@/lib/api/jobs";
 import {
   formatLongDate,
@@ -143,6 +144,15 @@ export function JobAnalysisView({ jobId }: { jobId: string }) {
   const groups = groupRequirements(job.requirements);
   const salary = job.salary ? formatSalary(job.salary) : null;
 
+  async function track() {
+    try {
+      const application = await trackJob(job.id);
+      router.push(`/applications/${application.id}`);
+    } catch (e) {
+      window.alert(e instanceof ApiError ? e.message : "Could not start tracking this job.");
+    }
+  }
+
   async function remove() {
     if (!window.confirm(`Delete "${job.title}" at ${job.company_name}?`)) return;
     try {
@@ -190,6 +200,7 @@ export function JobAnalysisView({ jobId }: { jobId: string }) {
           >
             Application questions
           </Link>
+          <Button onClick={() => void track()}>Track application</Button>
           <Button variant="danger" onClick={() => void remove()}>
             Delete job
           </Button>

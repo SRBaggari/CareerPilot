@@ -10,15 +10,17 @@ Master profile → Job discovery → JD analysis → Semantic matching → Skill
   → HUMAN APPROVAL → Browser-assisted application (stops before submit) → Tracking
 ```
 
-> **Status: Job recommendations.** Master profile (`/profile`), resume upload with reviewed
+> **Status: Application tracker.** Master profile (`/profile`), resume upload with reviewed
 > extraction, verified-evidence search, job discovery through provider adapters
 > (`/discover`), explained job recommendations (`/recommendations`), job description analysis (`/jobs`), explainable
 > candidate-job matching (`/jobs/[id]/match`), job-specific resume tailoring
 > (`/jobs/[id]/resume`), evidence-grounded cover letters (`/jobs/[id]/cover-letter`),
-> answers to application questions with approval (`/jobs/[id]/questions`), and an
+> answers to application questions with approval (`/jobs/[id]/questions`), an application
+> tracker with a board, timeline and follow-up reminders (`/applications`), and an
 > independent claim verification engine with a claim checker (`/verify`). No real job
-> source adapters (only a development mock) and no application submission yet.
-> See [docs/recommendations.md](docs/recommendations.md),
+> source adapters (only a development mock) and no browser-assisted submission yet.
+> See [docs/application-tracker.md](docs/application-tracker.md),
+> [docs/recommendations.md](docs/recommendations.md),
 > [docs/job-discovery.md](docs/job-discovery.md),
 > [docs/application-answers.md](docs/application-answers.md),
 > [docs/cover-letters.md](docs/cover-letters.md),
