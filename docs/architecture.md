@@ -148,7 +148,7 @@ generated claim is verified against the evidence it cites. Unsupported bullets a
 to that evidence verbatim; everything else unsupported is rejected and audited. See
 [resume-tailoring.md](resume-tailoring.md).
 
-## 6. Human-in-the-loop and automation safety _(approval guard implemented; automation planned)_
+## 6. Human-in-the-loop and automation safety _(implemented; see [browser-assistance.md](browser-assistance.md))_
 
 - Applications move through explicit states:
   `discovered → saved → analyzed → application_prepared → awaiting_approval → submitted →
@@ -157,9 +157,12 @@ to that evidence verbatim; everything else unsupported is rejected and audited. 
   Only a user action can move an application to `approved` or `submitted`. The database
   already rejects any post-approval status without `approved_at`, and any `submitted_at`
   earlier than `approved_at` (see database.md, section "Applications").
-- Playwright automation fills forms for an **approved** application and then **stops before the
-  final submit**, handing control back to the user. There is no code path that clicks a final
-  submit button without a fresh, explicit user confirmation.
+- Playwright automation fills forms for an **approved** application on a **supported** site
+  and then **pauses before the final submit** on an Application Review screen. Submission
+  requires the user's explicit confirmation of that exact review (its SHA-256); the browser
+  refills the form and submits only if it reads back to the confirmed review. While
+  filling, every non-GET request is blocked, so nothing can be sent early. Every action is
+  in an append-only audit log.
 - Automation never solves CAPTCHAs, bypasses authentication, or accesses sites whose terms
   prohibit it. Job discovery only uses official APIs and feeds that permit automated access,
   through provider adapters whose access policy is validated before use; refusals and bot
@@ -211,6 +214,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 6a    | Job discovery: provider adapters, access rules, mock source, filters, import (**done**) |
 | 6b    | Recommendations: discovery → analysis → evidence → matching → eligibility, explained (**done**) |
 | 6c    | Application tracker: lifecycle with approval gate, board, timeline, reminders (**done**) |
+| 7     | Browser-assisted applications: mock site, fill, review, confirm, audit (**done**) |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

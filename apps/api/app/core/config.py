@@ -64,6 +64,13 @@ class Settings(BaseSettings):
     # that permit automated access can have adapters; "mock" is development sample data.
     discovery_providers: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["mock"])
 
+    # Browser-assisted applications (Playwright). CareerPilot fills forms only on supported
+    # sites and never submits without the candidate's explicit confirmation.
+    automation_headless: bool = True
+    automation_timeout_ms: int = Field(default=15000, gt=0)
+    # The local mock application site (development and tests only; disabled in production).
+    automation_mock_site_url: str | None = None
+
     @field_validator("cors_origins", "discovery_providers", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:

@@ -7,7 +7,7 @@ preview: record facts and verified claims only, nothing added at render time.
 import io
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Literal
 
@@ -157,8 +157,11 @@ def pdf_text(text: str) -> str:
     return text.encode("latin-1", "replace").decode("latin-1")
 
 
-def to_pdf(content: ResumeContent) -> bytes:
+def to_pdf(content: ResumeContent, created: datetime | None = None) -> bytes:
+    """``created`` pins the PDF's creation date, so the same content gives the same bytes."""
     pdf = FPDF(format="A4")
+    if created is not None:
+        pdf.set_creation_date(created)
     pdf.set_margins(18, 16, 18)
     pdf.set_auto_page_break(auto=True, margin=16)
     pdf.add_page()

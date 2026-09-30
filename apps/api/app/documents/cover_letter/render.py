@@ -2,7 +2,7 @@
 the letter date and the "Re:" line, which come from the letter's own metadata."""
 
 import io
-from datetime import date
+from datetime import date, datetime
 
 from docx import Document
 from docx.shared import Pt
@@ -43,8 +43,10 @@ def to_docx(content: CoverLetterContent, on: date) -> bytes:
     return buffer.getvalue()
 
 
-def to_pdf(content: CoverLetterContent, on: date) -> bytes:
+def to_pdf(content: CoverLetterContent, on: date, created: datetime | None = None) -> bytes:
     pdf = FPDF(format="A4")
+    if created is not None:
+        pdf.set_creation_date(created)
     pdf.set_margins(22, 20, 22)
     pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()

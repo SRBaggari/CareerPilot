@@ -255,7 +255,7 @@ export function ApplicationDetailPage({ applicationId }: { applicationId: string
 
           <Card
             title="Approval"
-            description="Your explicit sign-off. It submits nothing: after approving, submit the application yourself, then record it as submitted."
+            description="Your explicit sign-off. It submits nothing: after approving, submit the application yourself and record it as submitted, or let CareerPilot fill it in on a supported site and submit only after you confirm the final review."
           >
             <ul className="space-y-1 text-sm" aria-label="Readiness">
               {app.readiness.map((item) => (
@@ -268,9 +268,21 @@ export function ApplicationDetailPage({ applicationId }: { applicationId: string
               ))}
             </ul>
             {approvedAlready ? (
-              <p className="mt-3 text-sm text-emerald-800" role="status">
-                Approved by you on {formatDateTime(app.approved_at)}.
-              </p>
+              <div className="mt-3 space-y-2">
+                <p className="text-sm text-emerald-800" role="status">
+                  Approved by you on {formatDateTime(app.approved_at)}.
+                </p>
+                {!app.applied_at ? (
+                  <p className="text-sm">
+                    <Link href={`/applications/${app.id}/assist`} className="font-medium underline">
+                      Fill it in on the site for my review
+                    </Link>{" "}
+                    <span className="text-zinc-500">
+                      (supported sites only; nothing is submitted until you confirm)
+                    </span>
+                  </p>
+                ) : null}
+              </div>
             ) : (
               <div className="mt-3 space-y-2">
                 {!canApprove ? (

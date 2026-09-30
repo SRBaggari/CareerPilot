@@ -3,6 +3,7 @@
 
 from app.ai.models import AIExecutionLog
 from app.applications.models import Application, ApplicationStatusHistory, FollowUp, Interview
+from app.automation.models import ApplicationRun, AutomationAuditEvent
 from app.db.base import Base
 from app.documents.models import (
     ApplicationAnswer,
@@ -37,7 +38,9 @@ __all__ = [
     "Achievement",
     "Application",
     "ApplicationAnswer",
+    "ApplicationRun",
     "ApplicationStatusHistory",
+    "AutomationAuditEvent",
     "Base",
     "CandidateEvidence",
     "CandidateProfile",
