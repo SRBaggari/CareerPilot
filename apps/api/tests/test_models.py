@@ -17,7 +17,8 @@ ASSOCIATION_TABLES = {"candidate_evidence_skills", "generated_claim_evidence"}
 
 
 def test_all_expected_tables_are_registered() -> None:
-    assert len(Base.metadata.tables) == 25 + len(ASSOCIATION_TABLES)
+    # 25 core tables + profile_suggestions + association tables
+    assert len(Base.metadata.tables) == 26 + len(ASSOCIATION_TABLES)
 
 
 def test_timestamps() -> None:

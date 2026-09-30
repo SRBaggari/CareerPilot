@@ -8,12 +8,19 @@ import os
 from collections.abc import AsyncIterator
 from pathlib import Path
 
+import httpx2
 import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
+
+from app.core.config import Settings
+from app.db.session import get_session
+from app.main import create_app
+from app.users.dependencies import get_current_user
+from app.users.models import User
 
 API_ROOT = Path(__file__).resolve().parents[2]
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
@@ -73,3 +80,38 @@ async def db(database_url: str) -> AsyncIterator[AsyncSession]:
             await session.close()
             await transaction.rollback()
     await engine.dispose()
+
+
+async def make_user(db: AsyncSession, email: str) -> User:
+    user = User(email=email)
+    db.add(user)
+    await db.flush()
+    return user
+
+
+@pytest.fixture
+async def user(db: AsyncSession) -> User:
+    return await make_user(db, "candidate@example.test")
+
+
+def client_for(db: AsyncSession, user: User) -> httpx2.AsyncClient:
+    """An HTTP client for the real app, acting as ``user`` inside the test transaction."""
+    app = create_app(Settings(_env_file=None, app_env="test"))
+
+    async def _session() -> AsyncIterator[AsyncSession]:
+        yield db
+
+    user_id = user.id  # resolve per request, as production does (survives rollbacks)
+
+    async def _user() -> User | None:
+        return await db.get(User, user_id)
+
+    app.dependency_overrides[get_session] = _session
+    app.dependency_overrides[get_current_user] = _user
+    return httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="http://test")
+
+
+@pytest.fixture
+async def client(db: AsyncSession, user: User) -> AsyncIterator[httpx2.AsyncClient]:
+    async with client_for(db, user) as http:
+        yield http

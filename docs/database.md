@@ -1,7 +1,7 @@
 # CareerPilot Database Schema
 
 PostgreSQL 16+ with the `pgvector` extension. Models live in `apps/api/app/<domain>/models.py`;
-migrations in `apps/api/migrations/versions/`. This document describes revision `0002`.
+migrations in `apps/api/migrations/versions/`. This document describes revision `0003`.
 
 ## 1. Core principle: evidence is the source of truth
 
@@ -44,6 +44,7 @@ erDiagram
     candidate_profiles ||--o{ candidate_skills : ""
     skills ||--o{ candidate_skills : ""
     candidate_profiles ||--o{ resumes : "uploads"
+    candidate_profiles ||--o{ profile_suggestions : "AI proposals"
     candidate_profiles ||--o{ candidate_evidence : ""
     projects |o--o{ candidate_evidence : "subject"
     work_experiences |o--o{ candidate_evidence : "subject"
@@ -101,8 +102,8 @@ erDiagram
 | Table | Purpose | Notable columns and constraints |
 | --- | --- | --- |
 | `users` | Account | `email` unique, must be lowercase. Auth.js tables come in the auth phase |
-| `candidate_profiles` | Master profile, **one per user** (`uq` on `user_id`) | name, headline, summary, contact info, links, `target_roles text[]` |
-| `educations` | Degrees and schooling | `degree_level` enum, `gpa ≤ gpa_scale`, `end_date ≥ start_date` |
+| `candidate_profiles` | Master profile, **one per user** (`uq` on `user_id`) | name, headline, summary, contact info, links. Job-search preferences: `preferred_roles` and `preferred_locations` (`text[]`), `work_modes` and `job_types` (`varchar[]`, each element CHECKed against its enum with `<@`), `experience_level` enum |
+| `educations` | Degrees and schooling | `degree_level` enum, `gpa ≤ gpa_scale` (`NUMERIC(5,2)`, so percentage scales work), `end_date ≥ start_date` |
 | `work_experiences` | Jobs, internships, volunteering | `employment_type` enum, a current role cannot have an `end_date` |
 | `projects` | Personal, academic or work projects | URLs, dates, role |
 | `certifications` | Certifications | `expiration_date ≥ issue_date` |
@@ -129,10 +130,13 @@ erDiagram
   CHECK `(source_type = '<type>') = (<type>_id IS NOT NULL)`. Together these guarantee that
   **exactly the FK matching `source_type` is set, and no other** (none for `profile`). This
   gives real referential integrity, unlike a generic `(type, id)` pair.
-- `origin`: `user_entered` or `resume_extracted`. `source_resume_id` may only be set when
+- `origin`: `user_entered`, `resume_extracted`, or `ai_suggested`. The API always writes
+  `user_entered`. The other two are only produced by the candidate **accepting** a
+  `profile_suggestions` row. `source_resume_id` may only be set when
   `origin = 'resume_extracted'`. If the uploaded file is deleted, the evidence is kept
   (`SET NULL`).
-- `confirmed_at`: when the candidate confirmed extracted evidence. Unconfirmed evidence must
+- `confirmed_at`: when the candidate confirmed the fact. The API sets it on every write
+  (typing a fact, or accepting a suggestion, counts as confirmation). Evidence without it must
   not be cited.
 - `content` must not be blank. `embedding` (HNSW-indexed) is used for semantic matching.
 
@@ -184,6 +188,15 @@ draft → ready_for_review → approved → filling → awaiting_submission → 
 
 Only `draft`, `ready_for_review` and `withdrawn` are allowed without approval.
 
+### AI profile suggestions
+
+`profile_suggestions` holds **AI-generated** proposals (e.g. from resume extraction) kept
+apart from the user-provided profile: `section`, `action` (create/update), `target_id`,
+`proposed_data` (JSONB, validated with the same schemas as manual edits before it is stored),
+`source`, `rationale`, and `status` (pending → accepted/rejected, with `reviewed_at` set exactly
+when decided). `applied_target_id` records the row created or updated on acceptance.
+`target_id` / `applied_target_id` have no FK because the target table varies by `section`.
+
 ### AI audit log
 
 `ai_execution_logs` (append-only) records every provider call: `operation` enum, `provider`,
@@ -218,11 +231,13 @@ triggers. Later phases must uphold them:
 1. Every FK on a personal row (evidence subject, `source_resume_id`, cited evidence, attached
    documents) must belong to the **same `candidate_profile_id`**.
 2. A claim marked `verified` must cite **at least one** evidence row.
-3. Only **confirmed** evidence (`confirmed_at IS NOT NULL` or `origin = 'user_entered'`) may be
-   cited.
+3. Only **confirmed** evidence (`confirmed_at IS NOT NULL`) may be cited.
 4. Every application status change writes an `application_status_history` row.
 5. Moving an application to `approved` or `submitted` happens only through an explicit user
    action. The database guarantees the timestamps exist; the API guarantees who set them.
+6. AI output never writes profile tables directly. It is stored in `profile_suggestions` and
+   applied only by `accept_suggestion`, in the same transaction that marks the suggestion
+   accepted (see [profile.md](profile.md)).
 
 ## 7. pgvector
 

@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     database_url: SecretStr | None = None
     database_echo: bool = False
 
+    # Until real authentication exists, development/test requests act as this user.
+    # Ignored (and all requests rejected) when app_env is "production".
+    dev_user_email: str | None = None
+
     # AI provider configuration — consumed by provider implementations in later phases.
     llm_provider: str = "anthropic"
     llm_model: str | None = None

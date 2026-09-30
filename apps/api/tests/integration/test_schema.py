@@ -70,3 +70,24 @@ async def test_claim_evidence_fk_is_deferred_no_action(db: AsyncSession) -> None
         )
     ).one()
     assert tuple(row) == ("a", True, True)  # NO ACTION, DEFERRABLE INITIALLY DEFERRED
+
+
+async def test_check_constraints_match_models(db: AsyncSession) -> None:
+    # Autogenerate does not detect CHECK constraints, so compare names with the models.
+    from sqlalchemy import CheckConstraint
+
+    expected = {
+        str(c.name)
+        for table in Base.metadata.tables.values()
+        for c in table.constraints
+        if isinstance(c, CheckConstraint)
+    }
+    actual = set(
+        await db.scalars(
+            text(
+                "SELECT conname FROM pg_constraint "
+                "WHERE contype = 'c' AND connamespace = 'public'::regnamespace"
+            )
+        )
+    )
+    assert actual == expected

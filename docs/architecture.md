@@ -174,6 +174,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | ----- | --------------------------------------------------------------------- |
 | 0     | Foundation: monorepo, tooling, DB wiring, health checks (**done**)    |
 | 1a    | Database schema: 27 tables, constraints, pgvector (**done**)          |
+| 1b    | Candidate profile API + dashboard, AI suggestion review (**done**)    |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

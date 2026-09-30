@@ -26,7 +26,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, enum_column, fk_column
 from app.db.vector import EmbeddingMixin, hnsw_cosine_index
-from app.profiles.models import EmploymentType, Skill
+from app.profiles.models import EmploymentType, Skill, WorkplaceType
 
 
 class JobSource(StrEnum):
@@ -36,12 +36,6 @@ class JobSource(StrEnum):
     COMPANY_SITE = "company_site"
     FEED = "feed"
     OTHER = "other"
-
-
-class WorkplaceType(StrEnum):
-    ONSITE = "onsite"
-    HYBRID = "hybrid"
-    REMOTE = "remote"
 
 
 class RequirementType(StrEnum):

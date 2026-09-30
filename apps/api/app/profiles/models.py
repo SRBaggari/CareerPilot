@@ -12,7 +12,7 @@ import uuid
 from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     BigInteger,
@@ -31,10 +31,17 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, enum_column, fk_column
+from app.db.base import (
+    Base,
+    TimestampMixin,
+    UUIDPrimaryKeyMixin,
+    enum_array_column,
+    enum_column,
+    fk_column,
+)
 from app.db.vector import EmbeddingMixin, hnsw_cosine_index
 
 if TYPE_CHECKING:
@@ -87,6 +94,21 @@ class EmploymentType(StrEnum):
     OTHER = "other"
 
 
+class WorkplaceType(StrEnum):
+    ONSITE = "onsite"
+    HYBRID = "hybrid"
+    REMOTE = "remote"
+
+
+class ExperienceLevel(StrEnum):
+    STUDENT = "student"
+    ENTRY_LEVEL = "entry_level"
+    JUNIOR = "junior"
+    MID_LEVEL = "mid_level"
+    SENIOR = "senior"
+    LEAD = "lead"
+
+
 class DocumentFormat(StrEnum):
     PDF = "pdf"
     DOCX = "docx"
@@ -115,6 +137,35 @@ class EvidenceOrigin(StrEnum):
 
     USER_ENTERED = "user_entered"
     RESUME_EXTRACTED = "resume_extracted"
+    AI_SUGGESTED = "ai_suggested"  # only ever created by accepting a ProfileSuggestion
+
+
+class SuggestionSection(StrEnum):
+    PERSONAL_INFO = "personal_info"
+    EDUCATION = "education"
+    WORK_EXPERIENCE = "work_experience"
+    PROJECT = "project"
+    CERTIFICATION = "certification"
+    ACHIEVEMENT = "achievement"
+    COURSEWORK = "coursework"
+    SKILL = "skill"
+    EVIDENCE = "evidence"
+
+
+class SuggestionAction(StrEnum):
+    CREATE = "create"
+    UPDATE = "update"
+
+
+class SuggestionSource(StrEnum):
+    RESUME_EXTRACTION = "resume_extraction"
+    AI_GENERATION = "ai_generation"
+
+
+class SuggestionStatus(StrEnum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
 
 
 # Evidence subject type -> FK column on candidate_evidence.
@@ -148,9 +199,17 @@ class CandidateProfile(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     website_url: Mapped[str | None] = mapped_column(Text)
     linkedin_url: Mapped[str | None] = mapped_column(Text)
     github_url: Mapped[str | None] = mapped_column(Text)
-    target_roles: Mapped[list[str]] = mapped_column(
+
+    # Job-search preferences (user-provided, like everything on this table).
+    preferred_roles: Mapped[list[str]] = mapped_column(
         ARRAY(String(200)), default=list, server_default=text("'{}'")
     )
+    preferred_locations: Mapped[list[str]] = mapped_column(
+        ARRAY(String(200)), default=list, server_default=text("'{}'")
+    )
+    work_modes: Mapped[list[str]] = enum_array_column(WorkplaceType)
+    job_types: Mapped[list[str]] = enum_array_column(EmploymentType)
+    experience_level: Mapped[ExperienceLevel | None] = enum_column(ExperienceLevel)
 
     __table_args__ = (UniqueConstraint("user_id"),)  # one master profile per user
 
@@ -182,6 +241,9 @@ class CandidateProfile(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     resumes: Mapped[list[Resume]] = relationship(
         back_populates="profile", cascade="all, delete-orphan", passive_deletes=True
     )
+    suggestions: Mapped[list[ProfileSuggestion]] = relationship(
+        back_populates="profile", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class Education(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -199,14 +261,19 @@ class Education(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     location: Mapped[str | None] = mapped_column(String(200))
     start_date: Mapped[date | None] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)
-    gpa: Mapped[Decimal | None] = mapped_column(Numeric(4, 2))
-    gpa_scale: Mapped[Decimal | None] = mapped_column(Numeric(4, 2))
+    gpa: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    gpa_scale: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     description: Mapped[str | None] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     profile: Mapped[CandidateProfile] = relationship(back_populates="educations")
-    coursework: Mapped[list[Coursework]] = relationship(back_populates="education")
-    evidence: Mapped[list[CandidateEvidence]] = relationship(back_populates="education")
+    # The DB sets coursework.education_id to NULL (ON DELETE SET NULL).
+    coursework: Mapped[list[Coursework]] = relationship(
+        back_populates="education", passive_deletes=True
+    )
+    evidence: Mapped[list[CandidateEvidence]] = relationship(
+        back_populates="education", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class WorkExperience(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -228,7 +295,9 @@ class WorkExperience(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     profile: Mapped[CandidateProfile] = relationship(back_populates="work_experiences")
-    evidence: Mapped[list[CandidateEvidence]] = relationship(back_populates="work_experience")
+    evidence: Mapped[list[CandidateEvidence]] = relationship(
+        back_populates="work_experience", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -246,7 +315,9 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     profile: Mapped[CandidateProfile] = relationship(back_populates="projects")
-    evidence: Mapped[list[CandidateEvidence]] = relationship(back_populates="project")
+    evidence: Mapped[list[CandidateEvidence]] = relationship(
+        back_populates="project", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class Certification(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -263,7 +334,9 @@ class Certification(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     profile: Mapped[CandidateProfile] = relationship(back_populates="certifications")
-    evidence: Mapped[list[CandidateEvidence]] = relationship(back_populates="certification")
+    evidence: Mapped[list[CandidateEvidence]] = relationship(
+        back_populates="certification", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class Achievement(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -278,7 +351,9 @@ class Achievement(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     profile: Mapped[CandidateProfile] = relationship(back_populates="achievements")
-    evidence: Mapped[list[CandidateEvidence]] = relationship(back_populates="achievement")
+    evidence: Mapped[list[CandidateEvidence]] = relationship(
+        back_populates="achievement", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 class Coursework(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -299,7 +374,9 @@ class Coursework(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     profile: Mapped[CandidateProfile] = relationship(back_populates="coursework")
     education: Mapped[Education | None] = relationship(back_populates="coursework")
-    evidence: Mapped[list[CandidateEvidence]] = relationship(back_populates="coursework")
+    evidence: Mapped[list[CandidateEvidence]] = relationship(
+        back_populates="coursework", cascade="all, delete-orphan", passive_deletes=True
+    )
 
 
 # --- Skills ------------------------------------------------------------------------
@@ -447,3 +524,44 @@ class CandidateEvidence(UUIDPrimaryKeyMixin, TimestampMixin, EmbeddingMixin, Bas
     coursework: Mapped[Coursework | None] = relationship(back_populates="evidence")
     source_resume: Mapped[Resume | None] = relationship()
     skills: Mapped[list[Skill]] = relationship(secondary=candidate_evidence_skills)
+
+
+# --- AI suggestions (kept apart from the master profile) ---------------------------
+
+
+class ProfileSuggestion(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """A proposed change to the master profile produced by AI (e.g. resume extraction).
+
+    Suggestions never modify the profile by themselves. They are applied only when the
+    candidate accepts one, through the same validated code path as a manual edit.
+    ``target_id`` / ``applied_target_id`` point into the table named by ``section`` (no FK,
+    as the target table varies).
+    """
+
+    __tablename__ = "profile_suggestions"
+    __table_args__ = (
+        CheckConstraint(
+            "(action = 'update') = (target_id IS NOT NULL) OR section = 'personal_info'",
+            "update_has_target",
+        ),
+        CheckConstraint("(status = 'pending') = (reviewed_at IS NULL)", "reviewed_when_decided"),
+        Index("ix_profile_suggestions_profile_status", "candidate_profile_id", "status"),
+    )
+
+    candidate_profile_id: Mapped[uuid.UUID] = fk_column("candidate_profiles.id", index=False)
+    section: Mapped[SuggestionSection] = enum_column(SuggestionSection)
+    action: Mapped[SuggestionAction] = enum_column(SuggestionAction)
+    target_id: Mapped[uuid.UUID | None] = mapped_column()
+    proposed_data: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    source: Mapped[SuggestionSource] = enum_column(SuggestionSource)
+    rationale: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[SuggestionStatus] = enum_column(
+        SuggestionStatus, default=SuggestionStatus.PENDING, server_default="pending"
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    applied_target_id: Mapped[uuid.UUID | None] = mapped_column()
+    ai_execution_log_id: Mapped[uuid.UUID | None] = fk_column(
+        "ai_execution_logs.id", ondelete="SET NULL", nullable=True
+    )
+
+    profile: Mapped[CandidateProfile] = relationship(back_populates="suggestions")

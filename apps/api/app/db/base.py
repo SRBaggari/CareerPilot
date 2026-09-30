@@ -15,12 +15,14 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     MetaData,
+    String,
     Table,
     Uuid,
     event,
     func,
     text,
 )
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncAttrs
 from sqlalchemy.orm import DeclarativeBase, Mapped, MappedColumn, mapped_column
 
@@ -81,6 +83,23 @@ def enum_column(enum_cls: type[StrEnum], **kwargs: Any) -> MappedColumn[Any]:
     @event.listens_for(column.column, "after_parent_attach")
     def _add_check(col: Column[Any], table: Table) -> None:
         table.append_constraint(CheckConstraint(f"{col.name} IN ({allowed})", f"{col.name}_enum"))
+
+    return column
+
+
+def enum_array_column(enum_cls: type[StrEnum]) -> MappedColumn[Any]:
+    """Non-null VARCHAR[] whose elements must be ``enum_cls`` values (defaults to empty).
+
+    Enforced by a CHECK named ``ck_<table>_<column>_enum`` using array containment.
+    """
+    column = mapped_column(ARRAY(String(ENUM_LENGTH)), default=list, server_default=text("'{}'"))
+    allowed = ", ".join(f"'{member.value}'" for member in enum_cls)
+
+    @event.listens_for(column.column, "after_parent_attach")
+    def _add_check(col: Column[Any], table: Table) -> None:
+        table.append_constraint(
+            CheckConstraint(f"{col.name} <@ ARRAY[{allowed}]::varchar[]", f"{col.name}_enum")
+        )
 
     return column
 

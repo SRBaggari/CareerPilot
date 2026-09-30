@@ -10,9 +10,9 @@ Master profile → Job discovery → JD analysis → Semantic matching → Skill
   → HUMAN APPROVAL → Browser-assisted application (stops before submit) → Tracking
 ```
 
-> **Status: Phase 1 (database schema).** Foundation plus the full relational schema (27 tables,
-> migrations, constraints, pgvector). No API features, job discovery, or AI generation yet.
-> See [docs/database.md](docs/database.md).
+> **Status: Candidate profile.** Full relational schema plus the master-profile API and
+> dashboard (`/profile`). No job discovery or AI generation yet. See
+> [docs/profile.md](docs/profile.md) and [docs/database.md](docs/database.md).
 
 ## Non-negotiable principles
 
@@ -61,6 +61,9 @@ npm run db:migrate
 npm run dev:api                # http://localhost:8000  (docs at /docs)
 npm run dev:web                # http://localhost:3000
 ```
+
+Open http://localhost:3000/profile to build your master profile. Until authentication is
+added, the API acts as the local user set by `DEV_USER_EMAIL` in `apps/api/.env`.
 
 Check the backend: `GET http://localhost:8000/health` (liveness) and
 `GET http://localhost:8000/health/ready` (database + pgvector readiness).

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { WorkflowSteps } from "@/components/WorkflowSteps";
 import { WORKFLOW_STEPS } from "@/lib/workflow";
 
@@ -24,9 +26,12 @@ export default function Home() {
           <span className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             CareerPilot
           </span>
-          <span className="rounded-full border border-zinc-300 px-3 py-1 text-xs text-zinc-600 dark:border-zinc-700 dark:text-zinc-400">
-            Early preview
-          </span>
+          <Link
+            href="/profile"
+            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            Open my profile
+          </Link>
         </div>
       </header>
 
