@@ -1,7 +1,7 @@
 # CareerPilot Database Schema
 
 PostgreSQL 16+ with the `pgvector` extension. Models live in `apps/api/app/<domain>/models.py`;
-migrations in `apps/api/migrations/versions/`. This document describes revision `0011` (job analysis: [job-analysis.md](job-analysis.md); matching: [matching.md](matching.md); resume tailoring: [resume-tailoring.md](resume-tailoring.md); claim verification: [claim-verification.md](claim-verification.md); cover letters: [cover-letters.md](cover-letters.md); application answers: [application-answers.md](application-answers.md)).
+migrations in `apps/api/migrations/versions/`. This document describes revision `0012` (job analysis: [job-analysis.md](job-analysis.md); matching: [matching.md](matching.md); resume tailoring: [resume-tailoring.md](resume-tailoring.md); claim verification: [claim-verification.md](claim-verification.md); cover letters: [cover-letters.md](cover-letters.md); application answers: [application-answers.md](application-answers.md); job discovery: [job-discovery.md](job-discovery.md)).
 
 ## 1. Core principle: evidence is the source of truth
 
@@ -149,7 +149,7 @@ erDiagram
 
 | Table | Purpose | Notable columns and constraints |
 | --- | --- | --- |
-| `jobs` | Job postings, **shared** across users | `source` enum + `source_name` + `external_id` unique (manual jobs without an external ID never conflict), salary range and ISO currency checks, `is_active`, `embedding` |
+| `jobs` | A job posting, owned by the user who added it (`created_by_user_id`) | pasted, entered, or imported from a job source (`input_method` pasted_text/manual_entry/discovered); (`created_by_user_id`, `source`, `source_name`, `external_id`) unique, so each user imports a posting once (manual jobs without an external ID never conflict); salary range and ISO currency checks, `is_active`, `embedding`. See [job-discovery.md](job-discovery.md) |
 | `job_requirements` | Structured requirements from a posting | `requirement_type`, `importance` (required/preferred), optional `skill_id`, `min_years ≥ 0`, `embedding` |
 | `job_matches` | Latest score for (candidate, job), unique per pair | `overall_score`, `semantic_score`, `skill_score` all in [0, 1], `scoring_version` |
 | `skill_gaps` | Requirements not (fully) met by a match | unique per (match, requirement), `severity` blocking/significant/minor |

@@ -4,6 +4,7 @@ from app.api.routes import (
     application_answers,
     candidate_evidence,
     cover_letters,
+    discovery,
     health,
     jobs,
     matching,
@@ -24,3 +25,4 @@ api_router.include_router(tailored_resumes.router)
 api_router.include_router(verification.router)
 api_router.include_router(cover_letters.router)
 api_router.include_router(application_answers.router)
+api_router.include_router(discovery.router)

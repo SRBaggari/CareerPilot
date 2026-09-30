@@ -72,13 +72,15 @@ class SalaryPeriod(StrEnum):
 class JobInputMethod(StrEnum):
     PASTED_TEXT = "pasted_text"  # description pasted by the user and analyzed
     MANUAL_ENTRY = "manual_entry"  # fields entered by the user, no extraction
+    DISCOVERED = "discovered"  # imported from a job source provider, then analyzed
 
 
 class Job(UUIDPrimaryKeyMixin, TimestampMixin, EmbeddingMixin, Base):
     __tablename__ = "jobs"
     __table_args__ = (
-        # NULL external_id (e.g. manual entries) never conflicts: NULLs are distinct.
-        UniqueConstraint("source", "source_name", "external_id"),
+        # A posting is imported once per user. NULL external_id (manual entries) never
+        # conflicts: NULLs are distinct.
+        UniqueConstraint("created_by_user_id", "source", "source_name", "external_id"),
         CheckConstraint(
             "salary_min IS NULL OR salary_max IS NULL OR salary_max >= salary_min",
             "salary_range",

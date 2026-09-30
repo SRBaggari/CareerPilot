@@ -4,7 +4,8 @@ Jobs added by a user are visible only to that user (``created_by_user_id``).
 """
 
 import uuid
-from datetime import UTC, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, time
 
 from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,11 +39,26 @@ from app.jobs.schemas import (
     RequirementOut,
     SalaryOut,
 )
+from app.profiles.models import EmploymentType, WorkplaceType
 from app.profiles.service import get_or_create_skill
 from app.resumes.extraction import normalize_text
 from app.users.models import User
 
 MAX_WARNINGS = 50
+
+
+@dataclass(frozen=True)
+class Provenance:
+    """Where an imported posting came from. Structured fields from the source take
+    precedence over values extracted from the description."""
+
+    source: JobSource
+    source_name: str
+    external_id: str
+    workplace_type: WorkplaceType | None = None
+    employment_type: EmploymentType | None = None
+    posted_date: date | None = None
+    deadline: date | None = None
 
 
 # --- Output -------------------------------------------------------------------------------
@@ -173,6 +189,8 @@ async def analyze_job(
     payload: JobAnalyzeIn,
     settings: Settings,
     llm: LLMProvider | None,
+    *,
+    provenance: Provenance | None = None,
 ) -> JobOut:
     text = normalize_text(payload.description)
     raw, analyzer_name = await _extract(session, user, text, settings, llm)
@@ -192,23 +210,31 @@ async def analyze_job(
         raise FieldErrors(missing)
 
     salary = extraction.salary
+    origin = provenance
     job = Job(
-        source=JobSource.MANUAL,
+        source=origin.source if origin else JobSource.MANUAL,
+        source_name=origin.source_name if origin else None,
+        external_id=origin.external_id if origin else None,
+        posted_at=(
+            datetime.combine(origin.posted_date, time(), UTC)
+            if origin and origin.posted_date
+            else None
+        ),
         url=payload.source_url,
         title=title[:300],
         company_name=company[:300],
         location=(payload.location or extraction.location or None),
-        workplace_type=extraction.workplace_type,
-        employment_type=extraction.employment_type,
+        workplace_type=(origin and origin.workplace_type) or extraction.workplace_type,
+        employment_type=(origin and origin.employment_type) or extraction.employment_type,
         description=text,
         salary_min=salary.minimum if salary else None,
         salary_max=salary.maximum if salary else None,
         salary_currency=salary.currency if salary else None,
         salary_period=salary.period if salary else None,
         salary_text=salary.text if salary else None,
-        application_deadline=extraction.application_deadline,
+        application_deadline=(origin and origin.deadline) or extraction.application_deadline,
         created_by_user_id=user.id,
-        input_method=JobInputMethod.PASTED_TEXT,
+        input_method=JobInputMethod.DISCOVERED if origin else JobInputMethod.PASTED_TEXT,
         analyzer_name=analyzer_name,
         analysis_warnings=[w[:300] for w in extraction.warnings][:MAX_WARNINGS],
         analyzed_at=datetime.now(UTC),

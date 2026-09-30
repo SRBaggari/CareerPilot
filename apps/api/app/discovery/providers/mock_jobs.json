@@ -1,0 +1,478 @@
+[
+ {
+  "id": "mock-1001",
+  "position": "Machine Learning Engineer Intern",
+  "org": {
+   "name": "Northwind Robotics"
+  },
+  "where": {
+   "city": "Hyderabad",
+   "country": "India",
+   "arrangement": "HYBRID"
+  },
+  "contract": "INTERN",
+  "level": "intern",
+  "published": "2026-09-26",
+  "apply_by": "2026-10-31",
+  "link": "https://jobs.example.com/mock/1001",
+  "body": "Northwind Robotics is hiring a Machine Learning Engineer Intern.\n\nJoin our perception team for a 6-month internship building ML pipelines for warehouse robots.\n\nRequirements:\n- Currently pursuing a Bachelor's degree in Computer Science or a related field.\n- Experience with Python.\n- Familiarity with PyTorch or TensorFlow.\n\nNice to have:\n- Experience with Docker.\n- Exposure to computer vision.",
+  "tags": [
+   "Python",
+   "PyTorch",
+   "TensorFlow",
+   "Docker"
+  ]
+ },
+ {
+  "id": "mock-1002",
+  "position": "Data Analyst",
+  "org": {
+   "name": "Bluefin Retail"
+  },
+  "where": {
+   "city": "Bengaluru",
+   "country": "India",
+   "arrangement": "ON_SITE"
+  },
+  "contract": "FULL_TIME",
+  "level": "entry",
+  "published": "2026-09-24",
+  "apply_by": null,
+  "link": "https://jobs.example.com/mock/1002",
+  "body": "Bluefin Retail is hiring a Data Analyst.\n\nAnalyse sales and inventory data and build dashboards for store operations.\n\nRequirements:\n- Strong proficiency in SQL.\n- Experience with Excel and Tableau or Power BI.\n- Bachelor's degree in a quantitative field.\n\nNice to have:\n- Experience with Python for data analysis.",
+  "tags": [
+   "SQL",
+   "Tableau",
+   "Power BI",
+   "Python"
+  ]
+ },
+ {
+  "id": "mock-1003",
+  "position": "Backend Engineer (Python)",
+  "org": {
+   "name": "Ledgerly"
+  },
+  "where": {
+   "city": "Remote",
+   "country": "India",
+   "arrangement": "REMOTE"
+  },
+  "contract": "FULL_TIME",
+  "level": "mid",
+  "published": "2026-09-22",
+  "apply_by": "2026-10-20",
+  "link": "https://jobs.example.com/mock/1003",
+  "body": "Ledgerly is hiring a Backend Engineer (Python).\n\nBuild and operate the APIs behind our accounting platform.\n\nRequirements:\n- 3+ years of experience building backend services.\n- Experience with Python and FastAPI.\n- Experience with PostgreSQL.\n\nNice to have:\n- Experience with Docker and Kubernetes.\n- Experience with AWS.",
+  "tags": [
+   "Python",
+   "FastAPI",
+   "PostgreSQL",
+   "Docker",
+   "Kubernetes",
+   "AWS"
+  ]
+ },
+ {
+  "id": "mock-1004",
+  "position": "Frontend Developer (React)",
+  "org": {
+   "name": "Pixel Harbor"
+  },
+  "where": {
+   "city": "Pune",
+   "country": "India",
+   "arrangement": "HYBRID"
+  },
+  "contract": "FULL_TIME",
+  "level": "junior",
+  "published": "2026-09-21",
+  "apply_by": null,
+  "link": "https://jobs.example.com/mock/1004",
+  "body": "Pixel Harbor is hiring a Frontend Developer (React).\n\nBuild accessible, fast user interfaces for our design collaboration product.\n\nRequirements:\n- 1+ years of experience with React and TypeScript.\n- Solid knowledge of HTML and CSS.\n\nNice to have:\n- Experience with Next.js.",
+  "tags": [
+   "React",
+   "TypeScript",
+   "Next.js"
+  ]
+ },
+ {
+  "id": "mock-1005",
+  "position": "Data Scientist",
+  "org": {
+   "name": "Cedar Health Analytics"
+  },
+  "where": {
+   "city": "Chennai",
+   "country": "India",
+   "arrangement": "HYBRID"
+  },
+  "contract": "FULL_TIME",
+  "level": "mid",
+  "published": "2026-09-19",
+  "apply_by": "2026-10-15",
+  "link": "https://jobs.example.com/mock/1005",
+  "body": "Cedar Health Analytics is hiring a Data Scientist.\n\nDevelop predictive models that help hospitals plan staffing and capacity.\n\nRequirements:\n- 2+ years of experience in data science.\n- Experience with Python, pandas and scikit-learn.\n- Master's degree in Statistics, Computer Science or a related field.\n\nNice to have:\n- Experience with SQL.",
+  "tags": [
+   "Python",
+   "pandas",
+   "scikit-learn",
+   "SQL"
+  ]
+ },
+ {
+  "id": "mock-1006",
+  "position": "ML Engineer",
+  "org": {
+   "name": "Northwind Robotics"
+  },
+  "where": {
+   "city": "Remote",
+   "country": "India",
+   "arrangement": "REMOTE"
+  },
+  "contract": "FULL_TIME",
+  "level": "entry",
+  "published": "2026-09-27",
+  "apply_by": "2026-11-01",
+  "link": "https://jobs.example.com/mock/1006",
+  "body": "Northwind Robotics is hiring a ML Engineer.\n\nShip machine learning models to production for our robot fleet.\n\nRequirements:\n- Experience with Python and SQL.\n- Experience deploying models with Docker on AWS.\n- Bachelor's degree in Computer Science or a related field.\n\nNice to have:\n- Experience with retrieval-augmented generation (RAG).\n- Experience with Kubernetes.",
+  "tags": [
+   "Python",
+   "SQL",
+   "Docker",
+   "AWS",
+   "RAG",
+   "Kubernetes"
+  ]
+ },
+ {
+  "id": "mock-1007",
+  "position": "Senior Machine Learning Engineer",
+  "org": {
+   "name": "Quanta Labs"
+  },
+  "where": {
+   "city": "Bengaluru",
+   "country": "India",
+   "arrangement": "HYBRID"
+  },
+  "contract": "FULL_TIME",
+  "level": "senior",
+  "published": "2026-09-15",
+  "apply_by": null,
+  "link": "https://jobs.example.com/mock/1007",
+  "body": "Quanta Labs is hiring a Senior Machine Learning Engineer.\n\nLead the design of large-scale recommendation systems.\n\nRequirements:\n- 5+ years of experience building machine learning systems.\n- Experience with Python, PyTorch and Spark.\n\nNice to have:\n- Experience with Kubernetes and Terraform.",
+  "tags": [
+   "Python",
+   "PyTorch",
+   "Spark",
+   "Kubernetes",
+   "Terraform"
+  ]
+ },
+ {
+  "id": "mock-1008",
+  "position": "DevOps Engineer",
+  "org": {
+   "name": "Stratus Cloudworks"
+  },
+  "where": {
+   "city": "Remote",
+   "country": "India",
+   "arrangement": "REMOTE"
+  },
+  "contract": "CONTRACT",
+  "level": "mid",
+  "published": "2026-09-18",
+  "apply_by": "2026-10-10",
+  "link": "https://jobs.example.com/mock/1008",
+  "body": "Stratus Cloudworks is hiring a DevOps Engineer.\n\nSix-month contract to modernise our CI/CD and infrastructure as code.\n\nRequirements:\n- Experience with Terraform and AWS.\n- Experience with Docker and Kubernetes.\n- Experience with GitHub Actions.\n\nNice to have:\n- Experience with Python scripting.",
+  "tags": [
+   "Terraform",
+   "AWS",
+   "Docker",
+   "Kubernetes",
+   "GitHub Actions",
+   "Python"
+  ]
+ },
+ {
+  "id": "mock-1009",
+  "position": "AI Research Intern",
+  "org": {
+   "name": "Open Meridian AI"
+  },
+  "where": {
+   "city": "Remote",
+   "country": "India",
+   "arrangement": "REMOTE"
+  },
+  "contract": "INTERN",
+  "level": "intern",
+  "published": "2026-09-25",
+  "apply_by": "2026-10-25",
+  "link": "https://jobs.example.com/mock/1009",
+  "body": "Open Meridian AI is hiring a AI Research Intern.\n\nResearch internship on evaluating and improving retrieval-augmented generation systems.\n\nRequirements:\n- Currently pursuing a degree in Computer Science or a related field.\n- Experience with Python.\n- Experience with retrieval-augmented generation (RAG).\n\nNice to have:\n- Published research or open-source contributions.",
+  "tags": [
+   "Python",
+   "RAG",
+   "LLM"
+  ]
+ },
+ {
+  "id": "mock-1010",
+  "position": "Full Stack Developer",
+  "org": {
+   "name": "Tandem Travel"
+  },
+  "where": {
+   "city": "Hyderabad",
+   "country": "India",
+   "arrangement": "ON_SITE"
+  },
+  "contract": "FULL_TIME",
+  "level": "junior",
+  "published": "2026-09-17",
+  "apply_by": null,
+  "link": "https://jobs.example.com/mock/1010",
+  "body": "Tandem Travel is hiring a Full Stack Developer.\n\nBuild booking features end to end, from database to UI.\n\nRequirements:\n- Experience with React and Node.js.\n- Experience with PostgreSQL.\n\nNice to have:\n- Experience with Docker.",
+  "tags": [
+   "React",
+   "Node.js",
+   "PostgreSQL",
+   "Docker"
+  ]
+ },
+ {
+  "id": "mock-1011",
+  "position": "NLP Engineer",
+  "org": {
+   "name": "Lexicon Legal Tech"
+  },
+  "where": {
+   "city": "Mumbai",
+   "country": "India",
+   "arrangement": "HYBRID"
+  },
+  "contract": "FULL_TIME",
+  "level": "mid",
+  "published": "2026-09-23",
+  "apply_by": "2026-10-30",
+  "link": "https://jobs.example.com/mock/1011",
+  "body": "Lexicon Legal Tech is hiring a NLP Engineer.\n\nBuild document understanding models for contract review.\n\nRequirements:\n- 2+ years of experience with natural language processing.\n- Experience with Python and PyTorch.\n- Experience with Hugging Face Transformers.\n\nNice to have:\n- Experience with retrieval-augmented generation (RAG).",
+  "tags": [
+   "Python",
+   "PyTorch",
+   "Transformers",
+   "RAG",
+   "NLP"
+  ]
+ },
+ {
+  "id": "mock-1012",
+  "position": "Data Engineer",
+  "org": {
+   "name": "Bluefin Retail"
+  },
+  "where": {
+   "city": "Bengaluru",
+   "country": "India",
+   "arrangement": "HYBRID"
+  },
+  "contract": "FULL_TIME",
+  "level": "mid",
+  "published": "2026-09-20",
+  "apply_by": null,
+  "link": "https://jobs.example.com/mock/1012",
+  "body": "Bluefin Retail is hiring a Data Engineer.\n\nBuild and maintain the data platform behind our analytics.\n\nRequirements:\n- Experience with SQL and Python.\n- Experience with Apache Airflow.\n- Experience with Spark.\n\nNice to have:\n- Experience with AWS.",
+  "tags": [
+   "SQL",
+   "Python",
+   "Airflow",
+   "Spark",
+   "AWS"
+  ]
+ },
+ {
+  "id": "mock-1013",
+  "position": "Mobile Developer (React Native)",
+  "org": {
+   "name": "Pocketwise"
+  },
+  "where": {
+   "city": "Remote",
+   "country": "India",
+   "arrangement": "REMOTE"
+  },
+  "contract": "PART_TIME",
+  "level": "junior",
+  "published": "2026-09-16",
+  "apply_by": null,
+  "link": "https://jobs.example.com/mock/1013",
+  "body": "Pocketwise is hiring a Mobile Developer (React Native).\n\nPart-time role building our personal finance app.\n\nRequirements:\n- Experience with React Native and JavaScript.\n\nNice to have:\n- Experience with offline sync.",
+  "tags": [
+   "React Native",
+   "JavaScript"
+  ]
+ },
+ {
+  "id": "mock-1014",
+  "position": "QA Engineer",
+  "org": {
+   "name": "Tandem Travel"
+  },
+  "where": {
+   "city": "Hyderabad",
+   "country": "India",
+   "arrangement": "ON_SITE"
+  },
+  "contract": "FULL_TIME",
+  "level": "entry",
+  "published": "2026-09-14",
+  "apply_by": "2026-10-05",
+  "link": "https://jobs.example.com/mock/1014",
+  "body": "Tandem Travel is hiring a QA Engineer.\n\nOwn automated testing for our web and mobile apps.\n\nRequirements:\n- Experience with Python or JavaScript test automation.\n- Experience with Selenium.\n\nNice to have:\n- Experience with CI pipelines.",
+  "tags": [
+   "Python",
+   "JavaScript",
+   "Selenium"
+  ]
+ },
+ {
+  "id": "mock-1015",
+  "position": "Product Analyst Intern",
+  "org": {
+   "name": "Pixel Harbor"
+  },
+  "where": {
+   "city": "Pune",
+   "country": "India",
+   "arrangement": "HYBRID"
+  },
+  "contract": "INTERN",
+  "level": "intern",
+  "published": "2026-09-28",
+  "apply_by": "2026-10-28",
+  "link": "https://jobs.example.com/mock/1015",
+  "body": "Pixel Harbor is hiring a Product Analyst Intern.\n\nHelp product managers understand how customers use our product.\n\nRequirements:\n- Currently pursuing a degree in any quantitative field.\n- Experience with SQL.\n\nNice to have:\n- Experience with Python.",
+  "tags": [
+   "SQL",
+   "Python"
+  ]
+ },
+ {
+  "id": "mock-1016",
+  "position": "Cloud Engineer",
+  "org": {
+   "name": "Stratus Cloudworks"
+  },
+  "where": {
+   "city": "Chennai",
+   "country": "India",
+   "arrangement": "HYBRID"
+  },
+  "contract": "FULL_TIME",
+  "level": "mid",
+  "published": "2026-09-13",
+  "apply_by": null,
+  "link": "https://jobs.example.com/mock/1016",
+  "body": "Stratus Cloudworks is hiring a Cloud Engineer.\n\nDesign and run secure cloud infrastructure for enterprise customers.\n\nRequirements:\n- 3+ years of experience with AWS.\n- Experience with Terraform.\n- AWS Certified Solutions Architect certification is required.\n\nNice to have:\n- Experience with Kubernetes.",
+  "tags": [
+   "AWS",
+   "Terraform",
+   "Kubernetes"
+  ]
+ },
+ {
+  "id": "mock-1017",
+  "position": "Computer Vision Engineer",
+  "org": {
+   "name": "Quanta Labs"
+  },
+  "where": {
+   "city": "Bengaluru",
+   "country": "India",
+   "arrangement": "ON_SITE"
+  },
+  "contract": "FULL_TIME",
+  "level": "mid",
+  "published": "2026-09-12",
+  "apply_by": null,
+  "link": "https://jobs.example.com/mock/1017",
+  "body": "Quanta Labs is hiring a Computer Vision Engineer.\n\nBuild visual inspection models for manufacturing lines.\n\nRequirements:\n- 2+ years of experience with computer vision.\n- Experience with Python and OpenCV.\n- Experience with PyTorch.\n\nNice to have:\n- Experience with edge deployment.",
+  "tags": [
+   "Python",
+   "OpenCV",
+   "PyTorch"
+  ]
+ },
+ {
+  "id": "mock-1018",
+  "position": "Junior Software Engineer",
+  "org": {
+   "name": "Ledgerly"
+  },
+  "where": {
+   "city": "Hyderabad",
+   "country": "India",
+   "arrangement": "HYBRID"
+  },
+  "contract": "FULL_TIME",
+  "level": "junior",
+  "published": "2026-09-26",
+  "apply_by": "2026-10-26",
+  "link": "https://jobs.example.com/mock/1018",
+  "body": "Ledgerly is hiring a Junior Software Engineer.\n\nWork across our Python services and React front end as part of a mentored graduate programme.\n\nRequirements:\n- Bachelor's degree in Computer Science or a related field.\n- Experience with Python.\n- Experience with Git.\n\nNice to have:\n- Experience with React.",
+  "tags": [
+   "Python",
+   "Git",
+   "React"
+  ]
+ },
+ {
+  "id": "mock-1019",
+  "position": "Lead Data Engineer",
+  "org": {
+   "name": "Cedar Health Analytics"
+  },
+  "where": {
+   "city": "Remote",
+   "country": "India",
+   "arrangement": "REMOTE"
+  },
+  "contract": "FULL_TIME",
+  "level": "lead",
+  "published": "2026-09-10",
+  "apply_by": null,
+  "link": "https://jobs.example.com/mock/1019",
+  "body": "Cedar Health Analytics is hiring a Lead Data Engineer.\n\nLead a team of data engineers building our clinical data platform.\n\nRequirements:\n- 7+ years of experience in data engineering.\n- Experience with Spark, SQL and Python.\n- Experience leading engineering teams.\n\nNice to have:\n- Experience with Airflow.",
+  "tags": [
+   "Spark",
+   "SQL",
+   "Python",
+   "Airflow"
+  ]
+ },
+ {
+  "id": "mock-1020",
+  "position": "Machine Learning Teaching Assistant",
+  "org": {
+   "name": "State Institute of Technology"
+  },
+  "where": {
+   "city": "Hyderabad",
+   "country": "India",
+   "arrangement": "ON_SITE"
+  },
+  "contract": "PART_TIME",
+  "level": null,
+  "published": "2026-09-29",
+  "apply_by": "2026-10-15",
+  "link": "https://jobs.example.com/mock/1020",
+  "body": "State Institute of Technology is hiring a Machine Learning Teaching Assistant.\n\nSupport lab sessions for the undergraduate machine learning course.\n\nRequirements:\n- Experience with Python.\n- Coursework in machine learning.\n\nNice to have:\n- Prior teaching or mentoring experience.",
+  "tags": [
+   "Python"
+  ]
+ }
+]

@@ -60,8 +60,11 @@ class Settings(BaseSettings):
     cover_letter_generator: Literal["auto", "rules", "llm"] = "auto"
     # Application answers: rule-based or LLM wording. Every sentence is verified either way.
     answer_generator: Literal["auto", "rules", "llm"] = "auto"
+    # Job discovery: provider adapters to enable, by name (comma-separated). Only sources
+    # that permit automated access can have adapters; "mock" is development sample data.
+    discovery_providers: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["mock"])
 
-    @field_validator("cors_origins", mode="before")
+    @field_validator("cors_origins", "discovery_providers", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
         if isinstance(value, str):

@@ -159,7 +159,9 @@ to that evidence verbatim; everything else unsupported is rejected and audited. 
   final submit**, handing control back to the user. There is no code path that clicks a final
   submit button without a fresh, explicit user confirmation.
 - Automation never solves CAPTCHAs, bypasses authentication, or accesses sites whose terms
-  prohibit it. Job discovery prefers official APIs and feeds that permit automated access.
+  prohibit it. Job discovery only uses official APIs and feeds that permit automated access,
+  through provider adapters whose access policy is validated before use; refusals and bot
+  challenges stop the request (see [job-discovery.md](job-discovery.md)).
 - Browser session state is treated as a secret (git-ignored, never logged).
 
 ## 7. Authentication _(planned)_
@@ -204,6 +206,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 5b    | Claim verification engine: independent, 4 statuses, reports, re-verify (**done**) |
 | 5c    | Cover letters: grounded generation, verify, regenerate or remove, edit, PDF/DOCX (**done**) |
 | 5d    | Application answers: understand, retrieve, answer, verify, edit, approve (**done**) |
+| 6a    | Job discovery: provider adapters, access rules, mock source, filters, import (**done**) |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |
