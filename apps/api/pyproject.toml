@@ -1,0 +1,71 @@
+[project]
+name = "careerpilot-api"
+version = "0.1.0"
+description = "CareerPilot backend API."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "sqlalchemy[asyncio]>=2.0.36",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    "pgvector>=0.3.6",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "httpx2>=2.13.1",
+]
+
+[tool.uv]
+package = false
+
+# --- Ruff (lint + format) -----------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle
+    "F",       # pyflakes
+    "I",       # isort
+    "B",       # bugbear
+    "UP",      # pyupgrade
+    "SIM",     # simplify
+    "ASYNC",   # async pitfalls
+    "S",       # bandit (security)
+    "RUF",
+]
+ignore = [
+    "B008",  # FastAPI's Depends() in defaults is idiomatic
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # assert is fine in tests
+
+# --- mypy -----------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["app", "tests", "migrations"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["pgvector.*", "asyncpg.*"]
+ignore_missing_imports = true
+
+# --- pytest ---------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: requires a running PostgreSQL database (set DATABASE_URL)",
+]

@@ -1,0 +1,50 @@
+# --- Secrets / environment ---------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Node / Next.js ----------------------------------------------------------
+node_modules/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+.vercel
+
+# --- Python ------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+
+# --- Playwright --------------------------------------------------------------
+playwright-report/
+test-results/
+playwright/.cache/
+# Browser session state may contain cookies/tokens — never commit it.
+playwright/.auth/
+
+# --- Local data (candidate documents are personal data) ---------------------
+storage/
+uploads/
+generated/
+
+# --- OS / editors ------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
