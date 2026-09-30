@@ -9,8 +9,12 @@ import {
   downloadUrl,
   generateTailoredResume,
   getLatestTailoredResume,
+  reverifyTailoredResume,
   type TailoredResume,
 } from "@/lib/api/tailoredResumes";
+import type { VerificationStatus } from "@/lib/api/verification";
+
+import { StatusBadge, VerificationReportView } from "../verification/VerificationReportView";
 
 import { ResumeEditor } from "./ResumeEditor";
 import { ResumePreview } from "./ResumePreview";
@@ -24,24 +28,54 @@ type State =
 const linkButton =
   "inline-flex items-center rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800";
 
-/** What verification did: how many claims passed, and every rewrite or rejection with why. */
-export function VerificationPanel({ resume }: { resume: TailoredResume }) {
-  const { verified_claims, rewritten, rejected, audit } = resume.verification;
+/** The independent verification report for the resume, with a way to re-check it. */
+export function VerificationPanel({
+  resume,
+  onReverify,
+  busy,
+}: {
+  resume: TailoredResume;
+  onReverify: () => void;
+  busy: boolean;
+}) {
   return (
     <Card
       id="verification"
-      title="Claim verification"
-      description="Every statement was checked against the evidence it cites. Unsupported statements were rewritten to your evidence or removed."
+      title="Verification report"
+      description="Every statement, including names, titles and dates, checked against your verified evidence and profile. Only supported statements are approved."
+      actions={
+        <Button size="sm" onClick={onReverify} disabled={busy}>
+          {busy ? "Verifying…" : "Re-verify"}
+        </Button>
+      }
     >
-      <p className="flex flex-wrap gap-3 text-sm" aria-label="Verification summary">
+      {resume.report ? (
+        <VerificationReportView report={resume.report} evidence={resume.evidence} />
+      ) : (
+        <EmptyState>This resume hasn&apos;t been verified yet. Re-verify it.</EmptyState>
+      )}
+    </Card>
+  );
+}
+
+/** What generation changed: statements rewritten to your evidence or removed, and why. */
+export function GenerationChanges({ resume }: { resume: TailoredResume }) {
+  const { verified_claims, rewritten, rejected, audit } = resume.verification;
+  return (
+    <Card
+      id="generation-changes"
+      title="Changes made during generation"
+      description="Generated statements the verification engine didn't approve were rewritten to the evidence they cited or removed."
+    >
+      <p className="flex flex-wrap gap-3 text-sm" aria-label="Generation summary">
         <span>
-          <strong>{verified_claims}</strong> verified
+          <strong>{verified_claims}</strong> kept
         </span>
         <span>
           <strong>{rewritten}</strong> rewritten
         </span>
         <span>
-          <strong>{rejected}</strong> rejected
+          <strong>{rejected}</strong> removed
         </span>
       </p>
       {audit.length > 0 ? (
@@ -53,8 +87,9 @@ export function VerificationPanel({ resume }: { resume: TailoredResume }) {
             >
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={item.outcome === "rewritten" ? "lock" : "ai"}>
-                  {item.outcome === "rewritten" ? "Rewritten" : "Rejected"}
+                  {item.outcome === "rewritten" ? "Rewritten" : "Removed"}
                 </Badge>
+                <StatusBadge status={item.verdict as VerificationStatus} />
                 <span className="text-xs text-zinc-500">{item.section}</span>
               </div>
               <p className="mt-1 text-zinc-500 line-through">{item.original_text}</p>
@@ -85,6 +120,7 @@ export function TailoredResumePage({ jobId }: { jobId: string }) {
   const [editing, setEditing] = useState(false);
   const [showSources, setShowSources] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,6 +154,18 @@ export function TailoredResumePage({ jobId }: { jobId: string }) {
       setError(e instanceof ApiError ? e.message : "Tailoring failed. Please try again.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function reverify(id: string) {
+    setVerifying(true);
+    setError(null);
+    try {
+      setState({ status: "ready", resume: await reverifyTailoredResume(id) });
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Verification failed. Please try again.");
+    } finally {
+      setVerifying(false);
     }
   }
 
@@ -172,6 +220,15 @@ export function TailoredResumePage({ jobId }: { jobId: string }) {
           ) : null}
         </p>
       ) : null}
+      {resume?.status === "verification_failed" && !editing ? (
+        <p
+          role="alert"
+          className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200"
+        >
+          This resume failed verification: some statements aren&apos;t supported by your current
+          evidence or profile. Review the report, then edit or regenerate it before you use it.
+        </p>
+      ) : null}
       {state.status === "loading" ? (
         <p role="status" className="text-sm text-zinc-500">
           Loading…
@@ -220,7 +277,14 @@ export function TailoredResumePage({ jobId }: { jobId: string }) {
               showSources={showSources}
             />
           </div>
-          <VerificationPanel resume={resume} />
+          <div className="space-y-6">
+            <VerificationPanel
+              resume={resume}
+              busy={verifying}
+              onReverify={() => void reverify(resume.id)}
+            />
+            <GenerationChanges resume={resume} />
+          </div>
         </div>
       ) : null}
     </div>

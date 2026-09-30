@@ -8,6 +8,7 @@ from app.api.routes import (
     profile,
     resumes,
     tailored_resumes,
+    verification,
 )
 
 api_router = APIRouter()
@@ -18,3 +19,4 @@ api_router.include_router(candidate_evidence.router)
 api_router.include_router(jobs.router)
 api_router.include_router(matching.router)
 api_router.include_router(tailored_resumes.router)
+api_router.include_router(verification.router)

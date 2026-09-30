@@ -3,6 +3,7 @@ import Link from "next/link";
 const LINKS = [
   { href: "/profile", label: "Profile" },
   { href: "/jobs", label: "Jobs" },
+  { href: "/verify", label: "Check claims" },
 ] as const;
 
 export function AppHeader({ current }: { current: (typeof LINKS)[number]["href"] }) {

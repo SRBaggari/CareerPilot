@@ -12,6 +12,7 @@ APPEND_ONLY_TABLES = {
     "claim_verifications",
     "ai_execution_logs",
     "generated_claim_evidence",
+    "verification_reports",
 }
 ASSOCIATION_TABLES = {
     "candidate_evidence_skills",
@@ -21,8 +22,9 @@ ASSOCIATION_TABLES = {
 
 
 def test_all_expected_tables_are_registered() -> None:
-    # 25 core tables + profile_suggestions + requirement_matches + association tables
-    assert len(Base.metadata.tables) == 27 + len(ASSOCIATION_TABLES)
+    # 25 core tables + profile_suggestions + requirement_matches + verification_reports
+    # + association tables
+    assert len(Base.metadata.tables) == 28 + len(ASSOCIATION_TABLES)
 
 
 def test_timestamps() -> None:

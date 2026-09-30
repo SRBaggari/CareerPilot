@@ -1,16 +1,17 @@
-"""Tailored resume pipeline (claim-first):
+"""Tailored resume pipeline (claim-first), connected to the claim verification engine:
 
 evidence retrieval -> candidate claims -> resume generation -> claim extraction ->
-claim verification -> final resume.
+claim verification (app.verification) -> final resume.
 
-Unsupported claims are rewritten to the evidence they cite (verbatim, so true by
-construction) or rejected; every decision is stored with its reason. Tailored resumes live
-in ``tailored_resumes``, separate from the uploaded master resumes.
+The engine judges every claim. Claims it doesn't approve are rewritten to the evidence
+they cite (verbatim) or removed, and the final resume is verified again, independently,
+before it is stored: a resume is VERIFIED only if the engine approves every claim in it,
+and VERIFICATION_FAILED otherwise. Tailored resumes live in ``tailored_resumes``,
+separate from the uploaded master resumes.
 """
 
 import uuid
 from dataclasses import dataclass
-from typing import Any
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,109 +31,128 @@ from app.documents.models import (
     VerificationMethod,
     VerificationVerdict,
 )
-from app.documents.resume.content import (
-    Claim,
-    ExperienceEntry,
-    ProjectEntry,
-    ResumeContent,
-)
-from app.documents.resume.generator import (
-    PROMPT_VERSION,
-    Draft,
-    LLMGenerator,
-    RuleGenerator,
-    achievement_of,
-    certification_of,
-    coursework_of,
-    education_of,
-    experience_of,
-    header_of,
-    project_of,
-)
+from app.documents.resume.content import Claim, ResumeContent
+from app.documents.resume.generator import PROMPT_VERSION, LLMGenerator, RuleGenerator
 from app.documents.resume.schemas import (
     AuditItem,
     CitedEvidence,
     TailoredResumeOut,
     VerificationSummary,
 )
-from app.documents.resume.verifier import ClaimKind, EvidenceText, Verification, verify_claim
-from app.documents.resume.workspace import EvidenceItem, Workspace, load_workspace
+from app.documents.resume.workspace import load_workspace
 from app.jobs.models import Job
 from app.matching import service as matching
 from app.matching.schemas import MatchReportOut
 from app.profiles import service as profiles
-from app.profiles.models import (
-    EVIDENCE_SUBJECT_COLUMNS,
-    CandidateEvidence,
-    CandidateProfile,
-    Resume,
-    VerificationStatus,
-)
+from app.profiles.models import CandidateEvidence, Resume
 from app.retrieval.service import record_label, with_sources
 from app.users.models import User
+from app.verification import service as verification
+from app.verification.engine import EngineRun, verify_claims
+from app.verification.extraction import extract_resume_claims
+from app.verification.knowledge import CandidateKnowledge, load_knowledge
+from app.verification.models import VerificationTrigger
+from app.verification.types import RECORD_BOUND_TYPES, ClaimInput, ClaimResult, ClaimType
 
 REWRITTEN = "Rewritten to the cited evidence."
+STATUS_LABELS = {
+    VerificationVerdict.SUPPORTED: "Supported",
+    VerificationVerdict.PARTIALLY_SUPPORTED: "Partially supported",
+    VerificationVerdict.UNSUPPORTED: "Unsupported",
+    VerificationVerdict.CONTRADICTED: "Contradicted",
+}
 
 
 @dataclass
 class Outcome:
+    """A generated claim that didn't survive verification as written."""
+
     section: str
-    position: int
+    position: int  # where its rewrite ended up, or -1 if it was removed
     original: str
     final: Claim | None
-    verification: Verification
+    verdict: VerificationVerdict
+    reason: str
+    confidence: float
+    method: str = "rule_based"
 
 
-# --- Verification -----------------------------------------------------------------------
+# --- Applying verdicts ------------------------------------------------------------------
 
 
-def _texts(ids: list[uuid.UUID], evidence: dict[uuid.UUID, EvidenceItem]) -> list[EvidenceText]:
-    return [EvidenceText(evidence[i].content, evidence[i].context) for i in ids if i in evidence]
+def apply_verdicts(
+    content: ResumeContent,
+    claims: list[ClaimInput],
+    results: list[ClaimResult],
+    knowledge: CandidateKnowledge,
+) -> tuple[ResumeContent, list[Outcome], list[str]]:
+    """Keep approved claims (citing the evidence that supports them); rewrite unapproved
+    bullets to their own evidence, verbatim; remove everything else unapproved.
 
+    Returns the content, the claims that changed, and a note for each kept claim that now
+    cites different evidence than it was generated with.
+    """
+    content = content.model_copy(deep=True)
+    verdicts = {
+        (c.section, c.position, c.claim_type): (c, r) for c, r in zip(claims, results, strict=True)
+    }
+    outcomes: list[Outcome] = []
+    notes: list[str] = []
 
-def _check(claim: Claim, kind: ClaimKind, allowed: dict[uuid.UUID, EvidenceItem]) -> Verification:
-    return verify_claim(claim.text, _texts(claim.evidence_ids, allowed), kind)
+    def outcome(result: ClaimResult, final: Claim | None, at: int) -> Outcome:
+        return Outcome(result.section, at, result.claim_text, final, result.verification_status,
+                       result.reason, result.confidence, result.method)  # fmt: skip
 
-
-def verify_draft(draft: Draft, ws: Workspace) -> tuple[ResumeContent, list[Outcome]]:
-    """Keep supported claims; rewrite or reject the rest. Returns the final content."""
-    content = draft.content.model_copy(deep=True)
-    outcomes: list[Outcome] = [
-        Outcome(section, -1, text, None, Verification(VerificationVerdict.UNSUPPORTED, why, 0.0))
-        for section, text, why in draft.prefiltered
-    ]
-
-    def keep(section: str, claims: list[Claim], kind: ClaimKind,
-             allowed: dict[uuid.UUID, EvidenceItem]) -> list[Claim]:  # fmt: skip
+    def keep(section: str, items: list[Claim], claim_type: ClaimType) -> list[Claim]:
         kept: list[Claim] = []
-        for claim in claims:
-            claim.evidence_ids = [i for i in dict.fromkeys(claim.evidence_ids) if i in allowed]
-            result = _check(claim, kind, allowed)
-            if result.supported:
-                final: Claim | None = claim
-            elif kind == ClaimKind.BULLET and claim.evidence_ids:
-                source = allowed[claim.evidence_ids[0]]  # rewrite: the evidence itself
-                final = Claim(text=source.content, evidence_ids=[source.id])
-            else:
-                final = None
-            if final is not None and all(k.text != final.text for k in kept):  # no duplicates
+        pending: list[tuple[ClaimResult, Claim | None]] = []
+        for position, item in enumerate(items):
+            claim, result = verdicts[(section, position, claim_type)]
+            final: Claim | None = None
+            if result.approved:
+                final = Claim(text=item.text, evidence_ids=result.evidence_ids)
+                if result.evidence_source == "retrieved":
+                    notes.append(
+                        f"“{item.text[:80]}” didn't cite evidence that supports it; "
+                        "it now cites your evidence that does."
+                    )
+            elif claim_type in RECORD_BOUND_TYPES:
+                scope = knowledge.scope(claim)
+                own = [i for i in claim.cited_evidence_ids if i in scope]
+                if own:  # the evidence it cited (the item's own, verified), word for word
+                    final = Claim(text=scope[own[0]].content, evidence_ids=[own[0]])
+            if final is not None and all(k.text != final.text for k in kept):
                 kept.append(final)
-            if not result.supported:
-                # A rewrite records where its replacement ended up, so the audit can show it.
-                at = next(i for i, k in enumerate(kept) if k.text == final.text) if final else -1
-                outcomes.append(Outcome(section, at, claim.text, final, result))
+            if not result.approved:
+                pending.append((result, final))
+        for result, final in pending:
+            at = next((i for i, k in enumerate(kept) if final and k.text == final.text), -1)
+            outcomes.append(outcome(result, final if at >= 0 else None, at))
         return kept
 
-    content.summary = keep("summary", content.summary, ClaimKind.SUMMARY, ws.evidence)
-    content.skills = keep("skills", content.skills, ClaimKind.SKILL, ws.evidence)
-    entries: list[tuple[str, ExperienceEntry | ProjectEntry]] = [
-        *(("experience", e) for e in content.experience),
-        *(("projects", p) for p in content.projects),
-    ]
-    for kind, entry in entries:
-        own = {e.id: e for e in ws.by_subject.get(entry.record_id, [])}
-        entry.bullets = keep(f"{kind}:{entry.record_id}", entry.bullets, ClaimKind.BULLET, own)
-    return content, outcomes
+    content.summary = keep("summary", content.summary, ClaimType.SUMMARY)
+    content.skills = keep("skills", content.skills, ClaimType.SKILL)
+    for job in content.experience:
+        job.bullets = keep(f"experience:{job.record_id}", job.bullets, ClaimType.EXPERIENCE)
+    for project in content.projects:
+        section = f"projects:{project.record_id}"
+        project.bullets = keep(section, project.bullets, ClaimType.PROJECT)
+
+    # Record facts are copied from the profile, so these only fail if the profile changed
+    # mid-generation. Unapproved ones are removed, never "corrected".
+    failed = {
+        (c.section, c.position)
+        for c, r in zip(claims, results, strict=True)
+        if c.is_record_fact and not r.approved and c.claim_type != ClaimType.CONTACT
+    }
+    for section in ("experience", "projects", "education", "certifications", "achievements",
+                    "coursework"):  # fmt: skip
+        entries = getattr(content, section)
+        setattr(content, section, [e for i, e in enumerate(entries) if (section, i) not in failed])
+    for c, r in zip(claims, results, strict=True):
+        if (c.section, c.position) in failed:
+            outcomes.append(outcome(r, None, -1))
+    return content, outcomes, notes
 
 
 # --- Loading and output -----------------------------------------------------------------
@@ -163,10 +183,7 @@ async def _current_report(
     return report
 
 
-async def _cited_evidence(
-    session: AsyncSession, content: ResumeContent
-) -> dict[uuid.UUID, CitedEvidence]:
-    ids = {i for _, _, claim in content.claims() for i in claim.evidence_ids}
+async def _evidence(session: AsyncSession, ids: set[uuid.UUID]) -> dict[uuid.UUID, CitedEvidence]:
     rows = await session.scalars(
         with_sources(select(CandidateEvidence).where(CandidateEvidence.id.in_(ids)))
     )
@@ -182,15 +199,13 @@ async def _out(session: AsyncSession, resume: TailoredResume) -> TailoredResumeO
             .options(selectinload(GeneratedClaim.verifications))
         )
     )
-    verified = [c for c in claims if c.status == ClaimStatus.VERIFIED]
-    kept_at = {(c.section, c.position): c.claim_text for c in verified}
+    in_document = [c for c in claims if c.status != ClaimStatus.REMOVED]
+    kept_at = {(c.section, c.position): c.claim_text for c in in_document}
     content = ResumeContent.model_validate(resume.content)
-    labels = {
-        f"experience:{e.record_id}": f"Experience \u00b7 {e.title}" for e in content.experience
-    }
-    labels |= {f"projects:{p.record_id}": f"Project \u00b7 {p.title}" for p in content.projects}
+    labels = {f"experience:{e.record_id}": f"Experience · {e.title}" for e in content.experience}
+    labels |= {f"projects:{p.record_id}": f"Project · {p.title}" for p in content.projects}
     audit = []
-    for claim in (c for c in claims if c.status == ClaimStatus.UNSUPPORTED):
+    for claim in (c for c in claims if c.status == ClaimStatus.REMOVED):
         check = claim.verifications[-1] if claim.verifications else None
         rewritten = check is not None and (check.rationale or "").endswith(REWRITTEN)
         audit.append(AuditItem(
@@ -201,6 +216,11 @@ async def _out(session: AsyncSession, resume: TailoredResume) -> TailoredResumeO
             verdict=check.verdict if check else VerificationVerdict.UNSUPPORTED,
             reason=(check.rationale or "").removesuffix(f" {REWRITTEN}") if check else "",
         ))  # fmt: skip
+    reports = await verification.reports_for(session, resume.id)
+    report = reports[0] if reports else None
+    ids = {i for _, _, claim in content.claims() for i in claim.evidence_ids}
+    if report is not None:
+        ids |= {i for r in report.claims for i in r.evidence_ids}
     job = await session.get(Job, resume.job_id)
     assert job is not None  # noqa: S101 - FK guarantees the job exists
     return TailoredResumeOut(
@@ -208,49 +228,73 @@ async def _out(session: AsyncSession, resume: TailoredResume) -> TailoredResumeO
         version=resume.version, status=resume.status, generator=resume.generator_name,
         created_at=resume.created_at, updated_at=resume.updated_at, content=content,
         verification=VerificationSummary(
-            verified_claims=len(verified),
+            verified_claims=sum(1 for c in in_document if c.status == ClaimStatus.VERIFIED),
             rewritten=sum(1 for a in audit if a.outcome == "rewritten"),
             rejected=sum(1 for a in audit if a.outcome == "rejected"),
             audit=audit,
         ),
-        notes=resume.notes, evidence=await _cited_evidence(session, content),
+        notes=resume.notes, evidence=await _evidence(session, ids), report=report,
     )  # fmt: skip
 
 
 # --- Persistence ------------------------------------------------------------------------
 
 
+def _method(result_method: str) -> VerificationMethod:
+    return VerificationMethod.LLM if result_method == "llm" else VerificationMethod.RULE_BASED
+
+
 async def _store_claims(
-    session: AsyncSession, resume: TailoredResume, content: ResumeContent, outcomes: list[Outcome]
+    session: AsyncSession,
+    resume: TailoredResume,
+    content: ResumeContent,
+    run: EngineRun,
+    outcomes: list[Outcome],
+    draft_log_id: uuid.UUID | None = None,
 ) -> None:
+    """Store the document's claims with the engine's verdicts, plus the removed originals."""
+    results = {(r.section, r.position): r for r in run.report.claims if r.claim_type in (
+        ClaimType.SUMMARY, ClaimType.SKILL, ClaimType.EXPERIENCE, ClaimType.PROJECT)}  # fmt: skip
     for section, position, claim in content.claims():
-        evidence = [await session.get(CandidateEvidence, i) for i in claim.evidence_ids]
+        result = results[(section, position)]
+        # Only approved claims link evidence (which makes that evidence undeletable).
+        linked = [await session.get(CandidateEvidence, i) for i in result.evidence_ids] if (
+            result.approved) else []  # fmt: skip
         record = GeneratedClaim(
             tailored_resume_id=resume.id, claim_text=claim.text, section=section,
-            position=position, status=ClaimStatus.VERIFIED,
-            evidence=[e for e in evidence if e is not None],
+            position=position,
+            status=ClaimStatus.VERIFIED if result.approved else ClaimStatus.UNSUPPORTED,
+            evidence=[e for e in linked if e is not None],
         )  # fmt: skip
         record.verifications.append(ClaimVerification(
-            verdict=VerificationVerdict.SUPPORTED, method=VerificationMethod.RULE_BASED,
-            confidence=1.0, rationale="Supported by the cited evidence.",
+            verdict=result.verification_status, method=_method(result.method),
+            confidence=result.confidence, rationale=result.reason,
+            # A result reused from the draft pass carries that pass's AI call.
+            ai_execution_log_id=(run.ai_execution_log_id or draft_log_id)
+            if result.method == "llm" else None,
         ))  # fmt: skip
         session.add(record)
         await session.flush()
         claim.claim_id = record.id
     for outcome in outcomes:
-        # Not linked to evidence: a rejected claim must not make evidence look "cited".
-        rejected = GeneratedClaim(
+        # Kept for audit only; never linked to evidence.
+        removed = GeneratedClaim(
             tailored_resume_id=resume.id, claim_text=outcome.original[:5000].strip() or "(blank)",
             section=outcome.section[:50], position=max(outcome.position, 0),
-            status=ClaimStatus.UNSUPPORTED,
+            status=ClaimStatus.REMOVED,
         )  # fmt: skip
-        rationale = outcome.verification.rationale
-        rejected.verifications.append(ClaimVerification(
-            verdict=outcome.verification.verdict, method=VerificationMethod.RULE_BASED,
-            confidence=outcome.verification.confidence,
-            rationale=f"{rationale} {REWRITTEN}" if outcome.final else rationale,
+        removed.verifications.append(ClaimVerification(
+            verdict=outcome.verdict, method=_method(outcome.method),
+            confidence=outcome.confidence,
+            rationale=f"{outcome.reason} {REWRITTEN}" if outcome.final else outcome.reason,
+            ai_execution_log_id=draft_log_id if outcome.method == "llm" else None,
         ))  # fmt: skip
-        session.add(rejected)
+        session.add(removed)
+
+
+def _status(run: EngineRun) -> DocumentStatus:
+    return DocumentStatus.VERIFIED if run.report.outcome == "approved" else (
+        DocumentStatus.VERIFICATION_FAILED)  # fmt: skip
 
 
 async def generate(
@@ -261,12 +305,14 @@ async def generate(
     llm: LLMProvider | None,
     settings: Settings,
     match_llm: LLMProvider | None = None,
+    verify_llm: LLMProvider | None = None,
 ) -> TailoredResumeOut:
-    """``llm`` words the resume; ``match_llm`` refreshes a missing or stale match report."""
+    """``llm`` words the resume; ``match_llm`` refreshes a missing or stale match report;
+    ``verify_llm`` is the verification engine's optional reviewer."""
     profile = await profiles.get_profile(session, user)
     job = await _owned_job(session, user, job_id)
-    report = await _current_report(session, user, job, embedder, match_llm, settings)
-    ws = await load_workspace(session, profile.id, job, report, embedder)
+    match_report = await _current_report(session, user, job, embedder, match_llm, settings)
+    ws = await load_workspace(session, profile.id, job, match_report, embedder)
 
     generator_name, log_id = RuleGenerator.name, None
     draft = RuleGenerator().generate(ws)
@@ -297,7 +343,25 @@ async def generate(
             "AI tailoring is not configured (set ANTHROPIC_API_KEY); rule-based tailoring was used."
         )
 
-    content, outcomes = verify_draft(draft, ws)
+    # Claim extraction and verification of the draft, then the rewrite-or-remove step.
+    knowledge = await load_knowledge(session, profile.id)
+    draft_claims = extract_resume_claims(draft.content)
+    draft_run = await verify_claims(session, user, knowledge, draft_claims, embedder,
+                                    verify_llm, settings)  # fmt: skip
+    content, outcomes, recited = apply_verdicts(
+        draft.content, draft_claims, draft_run.report.claims, knowledge
+    )
+    outcomes[:0] = [
+        Outcome(section, -1, text, None, VerificationVerdict.UNSUPPORTED, why, 0.0)
+        for section, text, why in draft.prefiltered
+    ]
+    # The final resume is verified again, as a whole: that verdict decides its status.
+    final_claims = extract_resume_claims(content)
+    final_run = await verify_claims(
+        session, user, knowledge, final_claims, embedder, verify_llm, settings,
+        reuse=list(zip(draft_claims, draft_run.report.claims, strict=True)),
+    )  # fmt: skip
+
     version = (await session.scalar(
         select(func.max(TailoredResume.version)).where(
             TailoredResume.candidate_profile_id == profile.id, TailoredResume.job_id == job.id)
@@ -314,13 +378,20 @@ async def generate(
     )
     resume = TailoredResume(
         candidate_profile_id=profile.id, job_id=job.id, base_resume_id=primary, version=version,
-        status=DocumentStatus.VERIFIED, content={}, generator_name=generator_name,
-        notes=draft.notes, ai_execution_log_id=log_id,
+        status=_status(final_run), content={}, generator_name=generator_name,
+        notes=[*draft.notes, *recited, *final_run.report.warnings], ai_execution_log_id=log_id,
     )  # fmt: skip
     session.add(resume)
     await session.flush()
-    await _store_claims(session, resume, content, outcomes)
+    await _store_claims(
+        session, resume, content, final_run, outcomes, draft_run.ai_execution_log_id
+    )
     resume.content = content.model_dump(mode="json")
+    await verification.store_report(
+        session, final_run.report, tailored_resume_id=resume.id,
+        trigger=VerificationTrigger.GENERATION,
+        ai_execution_log_id=final_run.ai_execution_log_id or draft_run.ai_execution_log_id,
+    )  # fmt: skip
     await session.commit()
     return await _out(session, resume)
 
@@ -355,128 +426,97 @@ async def get(session: AsyncSession, user: User, resume_id: uuid.UUID) -> Tailor
     return await _owned_resume(session, user, resume_id)
 
 
-# --- Editing ----------------------------------------------------------------------------
+# --- Editing and re-verification --------------------------------------------------------
 
 
-async def _evidence_map(
-    session: AsyncSession, profile_id: uuid.UUID
-) -> dict[uuid.UUID, EvidenceItem]:
-    rows = await session.scalars(
-        with_sources(select(CandidateEvidence).where(
-            CandidateEvidence.candidate_profile_id == profile_id,
-            CandidateEvidence.verification_status == VerificationStatus.VERIFIED,
-        ))
-    )  # fmt: skip
-    items = {}
-    for e in rows:
-        column = EVIDENCE_SUBJECT_COLUMNS.get(e.source_type)
-        items[e.id] = EvidenceItem(e.id, e.content, record_label(e) or "",
-                                   getattr(e, column) if column else None, 0.0)  # fmt: skip
-    return items
-
-
-def _record_facts(content: ResumeContent, profile: CandidateProfile) -> ResumeContent:
-    """Re-derive every record fact from the profile, so edits can't change them."""
-    jobs = {j.id: j for j in profile.work_experiences}
-    projects = {p.id: p for p in profile.projects}
-    educations = {e.id: e for e in profile.educations}
-    certs = {c.id: c for c in profile.certifications}
-    wins = {a.id: a for a in profile.achievements}
-    courses = {c.id: c for c in profile.coursework}
-    errors: dict[str, str] = {}
-
-    def need(kind: str, known: dict[uuid.UUID, Any], record_id: uuid.UUID) -> Any:
-        if record_id not in known:
-            errors[f"{kind}.{record_id}"] = f"Unknown {kind} entry; it isn't in your profile."
-        return known.get(record_id)
-
-    rebuilt = ResumeContent(
-        header=header_of(profile),
-        summary=content.summary,
-        skills=content.skills,
-        experience=[
-            experience_of(j, x.bullets)
-            for x in content.experience
-            if (j := need("experience", jobs, x.record_id))
-        ],
-        projects=[
-            project_of(pr, x.bullets)
-            for x in content.projects
-            if (pr := need("project", projects, x.record_id))
-        ],
-        education=[
-            education_of(ed)
-            for x in content.education
-            if (ed := need("education", educations, x.record_id))
-        ],
-        certifications=[
-            certification_of(ce)
-            for x in content.certifications
-            if (ce := need("certification", certs, x.record_id))
-        ],
-        achievements=[
-            achievement_of(ac)
-            for x in content.achievements
-            if (ac := need("achievement", wins, x.record_id))
-        ],
-        coursework=[
-            coursework_of(co)
-            for x in content.coursework
-            if (co := need("coursework", courses, x.record_id))
-        ],
+def _rejection(result: ClaimResult) -> str:
+    return (
+        f"{STATUS_LABELS[result.verification_status]}: “{result.claim_text[:80]}”. {result.reason}"
     )
-    if errors:
-        raise FieldErrors(errors)
-    return rebuilt
 
 
 async def update(
-    session: AsyncSession, user: User, resume_id: uuid.UUID, edited: ResumeContent
+    session: AsyncSession,
+    user: User,
+    resume_id: uuid.UUID,
+    edited: ResumeContent,
+    embedder: EmbeddingProvider,
+    llm: LLMProvider | None,
+    settings: Settings,
 ) -> TailoredResumeOut:
-    """Save the candidate's edits. Every claim is re-verified; nothing unsupported is saved."""
+    """Save the candidate's edits, only if the engine approves every claim in them.
+
+    Record facts (names, titles, employers, dates) are verified like everything else: an
+    edit that changes one is CONTRADICTED and rejected, not silently corrected.
+    """
     resume = await _owned_resume(session, user, resume_id)
     if resume.status == DocumentStatus.APPROVED:
         raise ConflictError("Approved resumes can't be edited; regenerate to make changes.")
-    profile = await session.scalar(
-        select(CandidateProfile).where(CandidateProfile.id == resume.candidate_profile_id).options(
-            *(selectinload(getattr(CandidateProfile, a)) for a in (
-                "work_experiences", "projects", "educations", "certifications", "achievements",
-                "coursework")))
-    )  # fmt: skip
-    assert profile is not None  # noqa: S101 - FK guarantees the profile exists
-    content = _record_facts(edited, profile)
-    evidence = await _evidence_map(session, profile.id)
-
-    errors: dict[str, str] = {}
-    for section, position, claim in content.claims():
-        if section == "summary" or section == "skills":
-            allowed, kind = evidence, ClaimKind.SUMMARY if section == "summary" else ClaimKind.SKILL
-        else:
-            record_id = uuid.UUID(section.split(":")[1])
-            allowed = {i: e for i, e in evidence.items() if e.subject_id == record_id}
-            kind = ClaimKind.BULLET
-        unknown = [i for i in claim.evidence_ids if i not in allowed]
-        if unknown or not claim.evidence_ids:
-            errors[f"{section}[{position}]"] = (
-                "Cites evidence that isn't this item's verified evidence." if unknown
-                else "Every statement must cite at least one piece of your evidence."
-            )  # fmt: skip
-            continue
-        result = verify_claim(claim.text, _texts(claim.evidence_ids, allowed), kind)
-        if not result.supported:
-            errors[f"{section}[{position}]"] = (
-                f"\u201c{claim.text[:80]}\u201d isn't supported: {result.rationale} "
-                "Add the fact as a highlight in your profile first, or keep to what it says."
-            )
+    knowledge = await load_knowledge(session, resume.candidate_profile_id)
+    run = await verify_claims(session, user, knowledge, extract_resume_claims(edited), embedder,
+                              llm, settings)  # fmt: skip
+    errors = {r.key: _rejection(r) for r in run.report.claims if not r.approved}
     if errors:
+        await session.commit()  # keeps the AI execution log, if any
         raise FieldErrors(errors)
 
+    content = edited.model_copy(deep=True)
     await session.execute(
         delete(GeneratedClaim).where(GeneratedClaim.tailored_resume_id == resume.id)
     )
-    await _store_claims(session, resume, content, [])
+    await _store_claims(session, resume, content, run, [])
     resume.content = content.model_dump(mode="json")
     resume.status = DocumentStatus.VERIFIED
+    await verification.store_report(
+        session, run.report, tailored_resume_id=resume.id, trigger=VerificationTrigger.EDIT,
+        ai_execution_log_id=run.ai_execution_log_id,
+    )  # fmt: skip
+    await session.commit()
+    return await _out(session, await _owned_resume(session, user, resume_id))
+
+
+async def reverify(
+    session: AsyncSession,
+    user: User,
+    resume_id: uuid.UUID,
+    embedder: EmbeddingProvider,
+    llm: LLMProvider | None,
+    settings: Settings,
+) -> TailoredResumeOut:
+    """Verify a stored resume again (e.g. after the profile changed) and record the result.
+
+    Claims that no longer pass are marked unsupported and the resume becomes
+    VERIFICATION_FAILED; nothing in it is changed or fixed automatically.
+    """
+    resume = await _owned_resume(session, user, resume_id)
+    content = ResumeContent.model_validate(resume.content)
+    knowledge = await load_knowledge(session, resume.candidate_profile_id)
+    run = await verify_claims(session, user, knowledge, extract_resume_claims(content), embedder,
+                              llm, settings)  # fmt: skip
+    results = {(r.section, r.position): r for r in run.report.claims}
+    stored = await session.scalars(
+        select(GeneratedClaim).where(
+            GeneratedClaim.tailored_resume_id == resume.id,
+            GeneratedClaim.status != ClaimStatus.REMOVED,
+        )
+    )
+    for claim in stored:
+        result = results.get((claim.section or "", claim.position))
+        if result is None or result.claim_text != claim.claim_text:
+            continue
+        claim.status = ClaimStatus.VERIFIED if result.approved else ClaimStatus.UNSUPPORTED
+        session.add(ClaimVerification(
+            generated_claim_id=claim.id, verdict=result.verification_status,
+            method=_method(result.method), confidence=result.confidence,
+            rationale=result.reason,
+            ai_execution_log_id=run.ai_execution_log_id if result.method == "llm" else None,
+        ))  # fmt: skip
+    if resume.status != DocumentStatus.APPROVED:
+        resume.status = _status(run)
+    await verification.store_report(
+        session, run.report, tailored_resume_id=resume.id, trigger=VerificationTrigger.MANUAL,
+        ai_execution_log_id=run.ai_execution_log_id,
+    )  # fmt: skip
     await session.commit()
     return await _out(session, await _owned_resume(session, user, resume_id))
 
@@ -493,5 +533,5 @@ async def delete_resume(session: AsyncSession, user: User, resume_id: uuid.UUID)
     resume = await _owned_resume(session, user, resume_id)
     if resume.status == DocumentStatus.APPROVED:
         raise ConflictError("Approved resumes can't be deleted.")
-    await session.delete(resume)  # its claims, links and verifications cascade
+    await session.delete(resume)  # its claims, links, verifications and reports cascade
     await session.commit()

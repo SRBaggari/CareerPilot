@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { TailoredResume } from "@/lib/api/tailoredResumes";
+import type { ClaimResult, VerificationReport } from "@/lib/api/verification";
 
 import { stubApi } from "../profile/testApi";
 import { dateRange } from "./ResumePreview";
@@ -13,6 +14,51 @@ const JOB_ID = "j1";
 const LATEST = `GET /jobs/${JOB_ID}/tailored-resumes/latest`;
 const GENERATE = `POST /jobs/${JOB_ID}/tailored-resumes`;
 const DOCKER = "Deployed ML models with Docker on AWS.";
+
+function result(overrides: Partial<ClaimResult>): ClaimResult {
+  return {
+    claim_text: DOCKER,
+    claim_type: "experience",
+    section: "experience:w1",
+    position: 0,
+    record_id: "w1",
+    cited_evidence_ids: ["e1"],
+    evidence_ids: ["e1"],
+    evidence_source: "cited",
+    verification_status: "supported",
+    confidence: 1,
+    reason: "Supported by the evidence.",
+    method: "rule_based",
+    ...overrides,
+  };
+}
+
+function makeReport(overrides: Partial<VerificationReport> = {}): VerificationReport {
+  return {
+    id: "r1",
+    document_type: "tailored_resume",
+    document_id: "t1",
+    trigger: "generation",
+    created_at: "2026-09-30T10:00:00Z",
+    verifier: "rules",
+    outcome: "approved",
+    counts: { supported: 2, partially_supported: 0, unsupported: 0, contradicted: 0 },
+    claims: [
+      result({}),
+      result({
+        claim_text: "Machine Learning Intern, Acme Analytics (2023-05-01 to 2024-05-01)",
+        claim_type: "employment",
+        section: "experience",
+        evidence_ids: [],
+        cited_evidence_ids: [],
+        evidence_source: "profile",
+        reason: "Matches your employment record.",
+      }),
+    ],
+    warnings: [],
+    ...overrides,
+  };
+}
 
 function makeResume(overrides: Partial<TailoredResume> = {}): TailoredResume {
   return {
@@ -108,6 +154,7 @@ function makeResume(overrides: Partial<TailoredResume> = {}): TailoredResume {
       e1: { content: DOCKER, record_label: "Machine Learning Intern at Acme Analytics" },
       e2: { content: "Built data pipelines in Python and SQL.", record_label: "Multi-Agent" },
     },
+    report: makeReport(),
     ...overrides,
   };
 }
@@ -145,9 +192,14 @@ describe("TailoredResumePage", () => {
     expect(within(preview).queryByText(/Kubernetes/)).toBeNull();
     expect(within(preview).queryByText(/50 ML models/)).toBeNull();
 
-    const panel = screen.getByRole("region", { name: "Claim verification" });
-    expect(within(panel).getByLabelText("Verification summary")).toHaveTextContent(
-      "4 verified1 rewritten1 rejected",
+    const report = screen.getByRole("region", { name: "Verification report" });
+    expect(within(report).getByLabelText("Verification outcome")).toHaveTextContent(/Approved/);
+    expect(within(report).getByText("Matches your employment record.")).toBeVisible();
+    expect(within(report).getByRole("button", { name: "Re-verify" })).toBeEnabled();
+
+    const panel = screen.getByRole("region", { name: "Changes made during generation" });
+    expect(within(panel).getByLabelText("Generation summary")).toHaveTextContent(
+      "4 kept1 rewritten1 removed",
     );
     expect(within(panel).getByText("Deployed 50 ML models with Docker on AWS.")).toBeVisible();
     expect(within(panel).getByText(/metrics not in the evidence: 50/)).toBeVisible();
@@ -162,6 +214,43 @@ describe("TailoredResumePage", () => {
       "href",
       "http://localhost:8000/api/v1/tailored-resumes/t1/download?format=docx",
     );
+  });
+
+  it("re-verifies and flags a resume that no longer passes", async () => {
+    const failed = makeResume({
+      status: "verification_failed",
+      report: makeReport({
+        trigger: "manual",
+        outcome: "rejected",
+        counts: { supported: 1, partially_supported: 0, unsupported: 0, contradicted: 1 },
+        claims: [
+          result({}),
+          result({
+            claim_text: "Machine Learning Intern, Acme Analytics (2023-05-01 to 2024-05-01)",
+            claim_type: "employment",
+            section: "experience",
+            evidence_ids: [],
+            evidence_source: "profile",
+            verification_status: "contradicted",
+            confidence: 0,
+            reason:
+              "Your employment record says: title is Data Science Intern, not Machine Learning Intern.",
+          }),
+        ],
+      }),
+    });
+    const calls = stubApi({
+      [LATEST]: () => ({ status: 200, body: makeResume() }),
+      "POST /tailored-resumes/t1/verify": () => ({ status: 200, body: failed }),
+    });
+    render(<TailoredResumePage jobId={JOB_ID} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Re-verify" }));
+
+    expect(await screen.findByText(/This resume failed verification/)).toBeVisible();
+    const report = screen.getByRole("region", { name: "Verification report" });
+    expect(within(report).getByLabelText("Verification outcome")).toHaveTextContent(/Rejected/);
+    expect(within(report).getByText(/title is Data Science Intern/)).toBeVisible();
+    expect(calls.map((c) => c.key)).toContain("POST /tailored-resumes/t1/verify");
   });
 
   it("shows the evidence behind each statement on request", async () => {

@@ -13,9 +13,10 @@ emphasizes the most relevant legitimate information and invents nothing. Code:
 | **Claims** | summary sentences, bullets, listed skills | Generated wording, each citing evidence IDs | Yes, but every claim is verified before it is kept |
 
 Record facts are never generated, so employment, projects, certifications and dates can't
-be invented or altered. When an edited resume is saved, record facts are re-derived from the
-profile. A changed title or date in the request is ignored, and an unknown record ID is
-rejected.
+be invented or altered. The [claim verification engine](claim-verification.md) checks
+them anyway, against the profile. An edit that changes a title, employer, date or name is
+rejected as CONTRADICTED, and an unknown record ID as UNSUPPORTED. Neither is silently
+corrected.
 
 ## Claim-first pipeline
 
@@ -24,9 +25,10 @@ rejected.
                         + a boost for evidence the job match report cites
 2. Candidate claims     each record's evidence, ranked; skills backed by evidence
 3. Resume generation    rules (verbatim evidence) or an LLM (wording + selection by ID)
-4. Claim extraction     every summary sentence, skill and bullet, with its cited IDs
-5. Claim verification   each claim against only the evidence it cites (below)
-6. Final resume         supported claims kept; unsupported ones rewritten or rejected
+4. Claim extraction     every statement, including record facts (verification engine)
+5. Claim verification   the independent engine (claim-verification.md)
+6. Final resume         approved claims kept; others rewritten or removed; then the whole
+                        resume is verified again, and that report decides its status
 ```
 
 If the job match report is missing or stale, it is computed first; its cited evidence
@@ -48,33 +50,41 @@ The LLM output is structured and strict. Any ID it returns that isn't the candid
 is dropped before verification and recorded as rejected: an unknown project, another
 record's evidence, another candidate's evidence, or unverified evidence.
 
-### Verification (`verifier.py`)
+### Verification
 
-This step is deterministic and conservative. A claim is kept only if every check passes.
+Generation is connected to the [claim verification engine](claim-verification.md), which
+runs independently of the generator. Each claim gets one of four statuses: SUPPORTED,
+PARTIALLY_SUPPORTED, UNSUPPORTED or CONTRADICTED. Only SUPPORTED is approved.
 
-| Check | Catches |
-| --- | --- |
-| Numbers and metrics must appear in the cited evidence | "cut latency by 60%" when the evidence says 35%; invented years; team sizes |
-| Vague quantities (dozens, millions, several) must appear | "used by millions" |
-| Technologies named must be named in the evidence | Kubernetes added to a Docker bullet |
-| Escalation words (led, managed, architected, senior, mentored) need the same role in the evidence | Exaggerated responsibilities |
-| Proper nouns must appear in the evidence | Invented employers, certifications, products |
-| At least 70% of content words must come from the evidence | Rewordings that add new facts or embellishments |
-| A skill must be named by the evidence it cites | Unsupported skills |
+The engine catches:
+- invented or borrowed numbers and scale;
+- a different number than the evidence states (CONTRADICTED);
+- invented names and certifications;
+- role escalation;
+- extra technologies and qualifiers;
+- conflicts with the profile: years of experience, degree, GPA, seniority, dates;
+- record-fact mismatches.
 
 ### Rewrite or reject
 
 | Claim | When unsupported |
 | --- | --- |
-| Bullet with valid cited evidence | **Rewritten** to that evidence verbatim, which is true by construction |
-| Bullet without valid evidence | **Rejected** |
-| Summary sentence, skill | **Rejected** |
+| Bullet that cited its item's own verified evidence | **Rewritten** to that evidence verbatim |
+| Bullet without valid cited evidence | **Removed** |
+| Summary sentence, skill | **Removed** |
 
-Every rewrite and rejection is stored and shown in the UI with its reason:
-- as a `generated_claims` row with status `unsupported`;
+The rewritten resume is verified again as a whole. It is `verified` only if that report
+approves every claim; otherwise it is `verification_failed`.
+
+Every rewrite and removal is stored and shown in the UI with the engine's verdict and
+reason:
+- as a `generated_claims` row with status `removed`;
 - plus a `claim_verifications` row.
 
-Rejected claims are **not** linked to evidence, so they never make evidence look "cited".
+Removed claims are **not** linked to evidence, so they never make evidence look "cited".
+The final report is stored in `verification_reports`. **Re-verify**
+(`POST /api/v1/tailored-resumes/{id}/verify`) checks a stored resume against the current
+evidence and profile. It reports problems and never fixes them.
 
 ## Storage
 
@@ -128,7 +138,8 @@ If the LLM fails, the resume falls back to rules. The failure is logged in
 
 The hallucination tests cover three levels:
 
-- `tests/test_resume_verifier.py` tests the verifier against invented or changed metrics,
+- `tests/test_verification_compare.py` and `tests/test_verification_engine.py` (see
+  [claim-verification.md](claim-verification.md)) test the verifier against invented or changed metrics,
   dates, vague quantities, technologies, exaggerated roles, invented names, unrelated
   content, missing or wrong citations, and unsupported skills. Faithful rewordings must
   still pass.

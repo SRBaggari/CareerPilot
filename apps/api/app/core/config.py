@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     match_judge: Literal["auto", "rules", "llm"] = "auto"
     # Tailored resumes: rules only, or LLM wording. Every claim is verified either way.
     resume_generator: Literal["auto", "rules", "llm"] = "auto"
+    # Claim verification: rule checks only, or rules plus an LLM reviewer. The reviewer can
+    # make any verdict stricter, but can't overrule a hard factual failure.
+    claim_verifier: Literal["auto", "rules", "llm"] = "auto"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

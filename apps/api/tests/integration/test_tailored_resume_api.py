@@ -317,7 +317,15 @@ async def test_hallucinated_claims_are_rewritten_or_rejected(
     assert foreign["id"] not in resume_text(resume)
 
     content = resume["content"]
-    assert content["summary"] == []  # both summary sentences were unsupported
+    # The fabricated sentence is gone. The true one cited another candidate's evidence: that
+    # citation is never used, but the engine found the candidate's own evidence for it, and
+    # says so explicitly.
+    [sentence] = content["summary"]
+    assert sentence["text"] == "Deployed ML models with Docker on AWS."
+    assert sentence["evidence_ids"] == [ids["docker"]]
+    [checked] = [c for c in resume["report"]["claims"] if c["section"] == "summary"]
+    assert checked["verification_status"] == "supported"
+    assert any("now cites your evidence" in n for n in resume["notes"])
     assert [s["text"] for s in content["skills"]] == ["Python", "Docker"]
     [job] = content["experience"]
     assert [b["text"] for b in job["bullets"]] == [
@@ -331,15 +339,14 @@ async def test_hallucinated_claims_are_rewritten_or_rejected(
     audit = {a["original_text"]: a for a in resume["verification"]["audit"]}
     expected = {
         "AWS Certified engineer who deployed ML models at Google.": ("rejected", "Certified"),
-        "Deployed ML models with Docker on AWS.": ("rejected", "no evidence"),
         "Kubernetes": ("rejected", "skill list"),
-        "Terraform": ("rejected", "no evidence"),
-        "Reduced model inference latency by 60% using ONNX.": ("rewritten", "60"),
+        "Terraform": ("rejected", "doesn't mention Terraform"),
+        "Reduced model inference latency by 60% using ONNX.": ("rewritten", "says 35%, not 60%"),
         "Spearheaded a RAG pipeline used by millions in Multi-Agent Research Assistant.": (
             "rewritten",
             "millions",
         ),
-        "Deployed the assistant on Kubernetes.": ("rejected", "no evidence"),
+        "Deployed the assistant on Kubernetes.": ("rejected", "Kubernetes"),
         "Built Quantum Trading Platform in 2019.": ("rejected", "record"),
         "00000000-0000-0000-0000-000000000000": ("rejected", "projects"),
     }
@@ -349,12 +356,13 @@ async def test_hallucinated_claims_are_rewritten_or_rejected(
         assert reason.lower() in audit[original]["reason"].lower(), audit[original]
     rewritten = audit["Reduced model inference latency by 60% using ONNX."]
     assert rewritten["final_text"] == EVIDENCE["latency"][1]
+    assert rewritten["verdict"] == "contradicted"  # the evidence states a different number
     summary = resume["verification"]
     assert summary["rewritten"] == 2 and summary["rejected"] == len(expected) - 2
 
-    # The originals are kept for audit as unsupported claims, never linked to evidence.
+    # The originals are kept for audit as removed claims, never linked to evidence.
     unsupported = list(
-        await db.scalars(select(GeneratedClaim).where(GeneratedClaim.status == "unsupported"))
+        await db.scalars(select(GeneratedClaim).where(GeneratedClaim.status == "removed"))
     )
     assert {c.claim_text for c in unsupported} == set(expected)
     linked: set[uuid.UUID] = set(
@@ -415,30 +423,55 @@ async def test_regenerating_replaces_the_draft_with_a_new_version(
     assert await db.scalar(select(func.count()).select_from(TailoredResume)) == 1
 
 
-async def test_supported_edits_are_saved_and_record_facts_are_protected(
-    api: httpx2.AsyncClient,
-) -> None:
+async def test_supported_edits_are_saved(api: httpx2.AsyncClient) -> None:
     ids = await build_profile(api)
     resume = await tailor(api, await build_job(api))
-    content = resume["content"]
+    content = copy.deepcopy(resume["content"])
     job = content["experience"][0]
     job["bullets"] = [
         {"text": "Cut model inference latency by 35% with ONNX.", "evidence_ids": [ids["latency"]]},
         {"text": EVIDENCE["docker"][1], "evidence_ids": [ids["docker"]]},
     ]
-    job["title"], job["start_date"] = "Head of Machine Learning", "2019-01-01"  # ignored
-    content["header"]["full_name"] = "Someone Else"  # ignored
     content["skills"] = content["skills"][:1]
 
     response = await api.put(f"/api/v1/tailored-resumes/{resume['id']}", json={"content": content})
     assert response.status_code == 200, response.text
     saved = response.json()
     assert_grounded(saved, ids)
-    job = saved["content"]["experience"][0]
-    assert job["bullets"][0]["text"] == "Cut model inference latency by 35% with ONNX."
-    assert (job["title"], job["start_date"]) == ("Machine Learning Intern", "2023-05-01")
-    assert saved["content"]["header"]["full_name"] == "Test Candidate"
+    assert saved["content"]["experience"][0]["bullets"][0]["text"] == (
+        "Cut model inference latency by 35% with ONNX."
+    )
     assert len(saved["content"]["skills"]) == 1
+    assert saved["status"] == "verified"
+    assert saved["report"]["trigger"] == "edit" and saved["report"]["outcome"] == "approved"
+
+
+@pytest.mark.parametrize(
+    ("change", "reason"),
+    [
+        (lambda c: c["experience"][0].update(title="Head of Machine Learning"),
+         "title is Machine Learning Intern, not Head of Machine Learning"),
+        (lambda c: c["experience"][0].update(start_date="2019-01-01"),
+         "start date is 2023-05-01, not 2019-01-01"),
+        (lambda c: c["experience"][0].update(company_name="Google"),
+         "employer is Acme Analytics, not Google"),
+        (lambda c: c["header"].update(full_name="Someone Else"),
+         "name is Test Candidate, not Someone Else"),
+        (lambda c: c["education"][0].update(degree="M.S."), "degree is B.Tech, not M.S."),
+    ],
+)  # fmt: skip
+async def test_edited_record_facts_are_contradicted_not_silently_corrected(
+    api: httpx2.AsyncClient, change: Any, reason: str
+) -> None:
+    await build_profile(api)
+    resume = await tailor(api, await build_job(api))
+    content = copy.deepcopy(resume["content"])
+    change(content)
+    response = await api.put(f"/api/v1/tailored-resumes/{resume['id']}", json={"content": content})
+    assert response.status_code == 422, response.text
+    [error] = response.json()["detail"]
+    assert error["msg"].startswith("Contradicted"), error
+    assert reason in error["msg"], error
 
 
 @pytest.mark.parametrize(
@@ -450,8 +483,19 @@ async def test_supported_edits_are_saved_and_record_facts_are_protected(
             "led",
         ),
         ({"text": "Deployed ML models with Docker and Kubernetes.", "key": "docker"}, "Kubernetes"),
-        ({"text": "Built data pipelines in Python and SQL.", "key": "python"}, "isn't this item"),
-        ({"text": "Won the company hackathon.", "key": None}, "cite at least one"),
+        ({"text": "Built data pipelines in Python and SQL.", "key": "python"}, "not to this item"),
+        ({"text": "Won the company hackathon.", "key": None}, "Unsupported"),
+        (
+            {"text": "Cut model inference latency by 35% with ONNX in 2021.", "key": "latency"},
+            "dated 2023\u20132024; the claim mentions 2021",
+        ),
+        (
+            {
+                "text": "Deployed ML models with Docker as Senior Engineer at Acme Analytics.",
+                "key": "docker",
+            },
+            "recorded as Machine Learning Intern",
+        ),
     ],
 )
 async def test_unsupported_edits_are_rejected_with_reasons(

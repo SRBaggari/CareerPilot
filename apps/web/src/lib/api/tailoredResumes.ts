@@ -1,6 +1,7 @@
 import { publicConfig } from "@/lib/config";
 
 import { apiFetch, ApiError, jsonBody } from "./client";
+import type { VerificationReport } from "./verification";
 
 /** A generated statement and the evidence it rests on. */
 export type Claim = { claim_id: string | null; text: string; evidence_ids: string[] };
@@ -89,6 +90,8 @@ export type TailoredResume = {
   };
   notes: string[];
   evidence: Record<string, { content: string; record_label: string | null }>;
+  /** The latest independent verification of the resume. */
+  report: VerificationReport | null;
 };
 
 export type DownloadFormat = "pdf" | "docx";
@@ -109,6 +112,10 @@ export const generateTailoredResume = (jobId: string) =>
 
 export const saveTailoredResume = (id: string, content: ResumeContent) =>
   apiFetch<TailoredResume>(`${ROOT}/${id}`, { method: "PUT", body: jsonBody({ content }) });
+
+/** Verify the stored resume again against your current evidence and profile. */
+export const reverifyTailoredResume = (id: string) =>
+  apiFetch<TailoredResume>(`${ROOT}/${id}/verify`, { method: "POST" });
 
 export const downloadUrl = (id: string, format: DownloadFormat) =>
   `${publicConfig.apiBaseUrl}${ROOT}/${id}/download?format=${format}`;

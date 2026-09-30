@@ -6,10 +6,11 @@ from pydantic import BaseModel
 
 from app.documents.models import DocumentStatus, VerificationVerdict
 from app.documents.resume.content import ResumeContent
+from app.verification.types import VerificationReportOut
 
 
 class AuditItem(BaseModel):
-    """A generated claim that was not kept as written."""
+    """A generated claim that was not kept as written (decided during generation)."""
 
     section: str
     original_text: str
@@ -44,7 +45,8 @@ class TailoredResumeOut(BaseModel):
     content: ResumeContent
     verification: VerificationSummary
     notes: list[str]
-    evidence: dict[uuid.UUID, CitedEvidence]  # every evidence row the resume cites
+    evidence: dict[uuid.UUID, CitedEvidence]  # every evidence row the resume or report cites
+    report: VerificationReportOut | None  # the latest independent verification of the resume
 
 
 class TailoredResumeEdit(BaseModel):

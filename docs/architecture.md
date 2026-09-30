@@ -137,7 +137,12 @@ This is the core integrity guarantee, so it is designed into the data model from
    for the user; they are never silently kept.
 4. Generated documents store their claim → evidence mapping so the user can audit any line.
 
-Tailored resumes implement this as a claim-first pipeline. Record facts (employers, titles,
+A dedicated [claim verification engine](claim-verification.md) (`app/verification/`)
+implements steps 3 and 4. It is independent of any generator: it extracts every claim,
+retrieves the candidate's verified evidence, and compares the two, and the stored profile
+too. Each claim gets SUPPORTED / PARTIALLY_SUPPORTED / UNSUPPORTED / CONTRADICTED; only
+SUPPORTED is approved, and nothing is upgraded silently. Tailored resumes implement this as
+a claim-first pipeline connected to the engine. Record facts (employers, titles,
 dates, degrees, certifications) are copied from the profile by ID and never generated. Every
 generated claim is verified against the evidence it cites. Unsupported bullets are rewritten
 to that evidence verbatim; everything else unsupported is rejected and audited. See
@@ -196,6 +201,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 3b    | Job description analysis: structured extraction, no inference (**done**) |
 | 4     | Candidate-job matching: grounded, explainable evidence coverage (**done**) |
 | 5a    | Resume tailoring: claim-first generation, verification, edit, PDF/DOCX (**done**) |
+| 5b    | Claim verification engine: independent, 4 statuses, reports, re-verify (**done**) |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

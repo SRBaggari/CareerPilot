@@ -28,6 +28,7 @@ from app.profiles.models import (
     candidate_evidence_skills,
 )
 from app.users.models import User
+from app.verification.models import VerificationReport
 
 __all__ = [
     "AIExecutionLog",
@@ -56,6 +57,7 @@ __all__ = [
     "SkillGap",
     "TailoredResume",
     "User",
+    "VerificationReport",
     "WorkExperience",
     "candidate_evidence_skills",
     "generated_claim_evidence",

@@ -10,12 +10,14 @@ Master profile → Job discovery → JD analysis → Semantic matching → Skill
   → HUMAN APPROVAL → Browser-assisted application (stops before submit) → Tracking
 ```
 
-> **Status: Resume tailoring.** Master profile (`/profile`), resume upload with reviewed
+> **Status: Claim verification.** Master profile (`/profile`), resume upload with reviewed
 > extraction, verified-evidence search, job description analysis (`/jobs`), explainable
-> candidate-job matching (`/jobs/[id]/match`), and job-specific resume tailoring with
-> per-claim verification, editing and PDF/DOCX download (`/jobs/[id]/resume`). No job
-> discovery, cover letters or applications yet.
-> See [docs/resume-tailoring.md](docs/resume-tailoring.md), [docs/matching.md](docs/matching.md),
+> candidate-job matching (`/jobs/[id]/match`), job-specific resume tailoring with editing
+> and PDF/DOCX download (`/jobs/[id]/resume`), and an independent claim verification engine
+> with stored reports and a claim checker (`/verify`). No job discovery, cover letters or
+> applications yet.
+> See [docs/claim-verification.md](docs/claim-verification.md),
+> [docs/resume-tailoring.md](docs/resume-tailoring.md), [docs/matching.md](docs/matching.md),
 > [docs/job-analysis.md](docs/job-analysis.md),
 > [docs/evidence-retrieval.md](docs/evidence-retrieval.md),
 > [docs/resume-ingestion.md](docs/resume-ingestion.md), [docs/profile.md](docs/profile.md),
