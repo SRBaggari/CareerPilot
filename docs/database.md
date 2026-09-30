@@ -1,7 +1,7 @@
 # CareerPilot Database Schema
 
 PostgreSQL 16+ with the `pgvector` extension. Models live in `apps/api/app/<domain>/models.py`;
-migrations in `apps/api/migrations/versions/`. This document describes revision `0004`.
+migrations in `apps/api/migrations/versions/`. This document describes revision `0005`.
 
 ## 1. Core principle: evidence is the source of truth
 
@@ -138,7 +138,11 @@ erDiagram
 - `confirmed_at`: when the candidate confirmed the fact. The API sets it on every write
   (typing a fact, or accepting a suggestion, counts as confirmation). Evidence without it must
   not be cited.
-- `content` must not be blank. `embedding` (HNSW-indexed) is used for semantic matching.
+- `content` must not be blank. `embedding` (HNSW-indexed) is used for semantic matching,
+  together with `embedding_model` and `embedded_at`. Vectors are only compared within one
+  model, and editing `content` clears them. See [evidence-retrieval.md](evidence-retrieval.md).
+- `verification_status` is a **generated column** (`verified` when `confirmed_at` is set,
+  otherwise `unverified`). Only verified evidence may be used for application generation.
 
 ### Jobs and matching
 

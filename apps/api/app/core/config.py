@@ -36,8 +36,11 @@ class Settings(BaseSettings):
     llm_provider: str = "anthropic"
     llm_model: str = "claude-opus-5-5"
     anthropic_api_key: SecretStr | None = None
-    embedding_provider: str | None = None
-    embedding_model: str | None = None
+    # Embeddings for evidence retrieval. "hash" is a deterministic, offline, *lexical*
+    # embedder (tests and keyless development); use "voyage" for real semantic search.
+    embedding_provider: Literal["hash", "voyage"] = "hash"
+    embedding_model: str | None = None  # provider default when unset
+    voyage_api_key: SecretStr | None = None
 
     # Resume ingestion.
     storage_dir: str = "storage"  # local directory for uploaded files (git-ignored)

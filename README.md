@@ -10,10 +10,12 @@ Master profile → Job discovery → JD analysis → Semantic matching → Skill
   → HUMAN APPROVAL → Browser-assisted application (stops before submit) → Tracking
 ```
 
-> **Status: Resume ingestion.** Master profile API and dashboard (`/profile`), plus resume
-> upload (PDF/DOCX) with extraction you review before anything is saved. No job discovery
-> or matching yet. See [docs/resume-ingestion.md](docs/resume-ingestion.md),
-> [docs/profile.md](docs/profile.md), and [docs/database.md](docs/database.md).
+> **Status: Evidence retrieval.** Master profile and dashboard (`/profile`), resume upload
+> with reviewed extraction, and semantic search over verified candidate evidence
+> (`POST /api/candidate/evidence/search`). No job discovery or matching yet. See
+> [docs/evidence-retrieval.md](docs/evidence-retrieval.md),
+> [docs/resume-ingestion.md](docs/resume-ingestion.md), [docs/profile.md](docs/profile.md),
+> and [docs/database.md](docs/database.md).
 
 ## Non-negotiable principles
 
@@ -67,7 +69,9 @@ Open http://localhost:3000/profile to build your master profile. Until authentic
 added, the API acts as the local user set by `DEV_USER_EMAIL` in `apps/api/.env`.
 
 Resume parsing works offline with a rule-based parser. To use Claude for extraction, set
-`ANTHROPIC_API_KEY` in `apps/api/.env` (`RESUME_PARSER=auto` picks it up).
+`ANTHROPIC_API_KEY` in `apps/api/.env` (`RESUME_PARSER=auto` picks it up). Evidence search
+uses offline lexical embeddings by default; set `EMBEDDING_PROVIDER=voyage` and
+`VOYAGE_API_KEY` for semantic search.
 
 Check the backend: `GET http://localhost:8000/health` (liveness) and
 `GET http://localhost:8000/health/ready` (database + pgvector readiness).

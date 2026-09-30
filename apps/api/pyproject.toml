@@ -17,6 +17,7 @@ dependencies = [
     "python-docx>=1.2.0",
     "python-multipart>=0.0.32",
     "anthropic>=1.9.0",
+    "httpx2>=2.13.1",
 ]
 
 [dependency-groups]
@@ -24,7 +25,6 @@ dev = [
     "pytest>=8.3",
     "ruff>=0.8",
     "mypy>=1.13",
-    "httpx2>=2.13.1",
 ]
 
 [tool.uv]

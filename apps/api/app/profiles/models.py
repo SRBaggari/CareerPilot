@@ -19,6 +19,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
+    Computed,
     Date,
     DateTime,
     ForeignKey,
@@ -130,6 +131,11 @@ class EvidenceSourceType(StrEnum):
     ACHIEVEMENT = "achievement"
     COURSEWORK = "coursework"
     PROFILE = "profile"  # general statement not tied to one item
+
+
+class VerificationStatus(StrEnum):
+    VERIFIED = "verified"  # confirmed by the candidate (typed by them or accepted by them)
+    UNVERIFIED = "unverified"
 
 
 class EvidenceOrigin(StrEnum):
@@ -520,6 +526,19 @@ class CandidateEvidence(UUIDPrimaryKeyMixin, TimestampMixin, EmbeddingMixin, Bas
     )
     # Extracted evidence must be confirmed by the candidate before claims may cite it.
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Derived by PostgreSQL from confirmed_at, so the two can never disagree. Only
+    # "verified" evidence may be used for application generation.
+    verification_status: Mapped[VerificationStatus] = mapped_column(
+        String(16),
+        # Written in PostgreSQL's canonical form so migration drift checks can compare it.
+        Computed(
+            "CASE WHEN (confirmed_at IS NOT NULL) THEN 'verified'::text "
+            "ELSE 'unverified'::text END",
+            persisted=True,
+        ),
+    )
+    # When ``embedding`` was computed (with ``embedding_model``); NULL = needs indexing.
+    embedded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     profile: Mapped[CandidateProfile] = relationship(back_populates="evidence")
     project: Mapped[Project | None] = relationship(back_populates="evidence")

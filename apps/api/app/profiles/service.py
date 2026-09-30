@@ -438,6 +438,9 @@ async def update_evidence(
             "This evidence is cited by a generated document; editing it would make that "
             "document's claims untraceable. Add new evidence instead."
         )
+    if evidence.content != content:
+        # The stored vector describes the old text; the retrieval index re-embeds it.
+        evidence.embedding = evidence.embedding_model = evidence.embedded_at = None
     evidence.content = content
     await _save(session, commit)
     await session.refresh(evidence)

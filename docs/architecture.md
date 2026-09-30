@@ -119,8 +119,10 @@ class LLMProvider(Protocol):
   fakes.
 - Adding a provider means adding one adapter; no domain code changes.
 
-_(Planned)_ An `EmbeddingProvider` protocol (`dimensions`, `embed(texts)`) will follow the same
-pattern for matching.
+`app/ai/embeddings.py` applies the same pattern to embeddings. `EmbeddingProvider` exposes
+`name`, `model`, `dimensions`, `confidence_thresholds` and `embed(texts, input_type)`. There
+are two adapters: an offline hashing embedder (the default, used in tests) and Voyage AI. See
+[evidence-retrieval.md](evidence-retrieval.md).
 
 ## 5. Evidence and claim traceability _(schema implemented; generation planned)_
 
@@ -184,6 +186,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 1a    | Database schema: 27 tables, constraints, pgvector (**done**)          |
 | 1b    | Candidate profile API + dashboard, AI suggestion review (**done**)    |
 | 2     | Resume ingestion: PDF/DOCX, grounded extraction, review (**done**)    |
+| 3a    | Evidence RAG: embeddings, pgvector search, verified-only retrieval (**done**) |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

@@ -28,6 +28,12 @@ class ConflictError(DomainError):
     status_code = status.HTTP_409_CONFLICT
 
 
+class ServiceUnavailableError(DomainError):
+    """A dependency (e.g. the embedding service) is unavailable or misconfigured."""
+
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+
 class FieldValidationError(DomainError):
     """A validation failure detected by a service (e.g. a cross-row rule)."""
 
