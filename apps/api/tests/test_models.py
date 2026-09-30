@@ -23,8 +23,8 @@ ASSOCIATION_TABLES = {
 
 def test_all_expected_tables_are_registered() -> None:
     # 25 core tables + profile_suggestions + requirement_matches + verification_reports
-    # + association tables
-    assert len(Base.metadata.tables) == 28 + len(ASSOCIATION_TABLES)
+    # + application_answers + association tables
+    assert len(Base.metadata.tables) == 29 + len(ASSOCIATION_TABLES)
 
 
 def test_timestamps() -> None:

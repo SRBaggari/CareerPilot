@@ -6,6 +6,7 @@ generated.
 """
 
 import re
+import uuid
 
 from app.documents.cover_letter.content import CoverLetterContent
 from app.documents.resume.content import ResumeContent
@@ -137,6 +138,17 @@ def extract_cover_letter_claims(content: CoverLetterContent) -> list[ClaimInput]
         )
     claims.append(ClaimInput(content.closing, ClaimType.LETTER, section="closing", facts=allowed))
     return claims
+
+
+def extract_answer_claims(
+    sentences: list[tuple[str, list[uuid.UUID]]], allowed_names: list[str]
+) -> list[ClaimInput]:
+    """Every sentence of an application answer, as (text, cited evidence IDs)."""
+    facts = {"allowed_names": allowed_names}
+    return [
+        ClaimInput(text, ClaimType.ANSWER, list(ids), "answer", n, facts=facts)
+        for n, (text, ids) in enumerate(sentences)
+    ]
 
 
 def extract_text_claims(text: str) -> list[ClaimInput]:

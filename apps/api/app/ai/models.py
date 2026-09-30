@@ -23,6 +23,7 @@ class AIOperation(StrEnum):
     SKILL_GAP_ANALYSIS = "skill_gap_analysis"
     RESUME_GENERATION = "resume_generation"
     COVER_LETTER_GENERATION = "cover_letter_generation"
+    APPLICATION_ANSWER = "application_answer"
     CLAIM_VERIFICATION = "claim_verification"
     OTHER = "other"
 

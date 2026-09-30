@@ -123,7 +123,7 @@ def assess(
                          source="profile")  # fmt: skip
         return Assessment(result, veto=True, offered={})
 
-    if claim.claim_type == ClaimType.LETTER and is_non_factual(
+    if claim.claim_type in (ClaimType.LETTER, ClaimType.ANSWER) and is_non_factual(
         claim.text, set((claim.facts or {}).get("allowed_names", []))
     ):
         result = _result(

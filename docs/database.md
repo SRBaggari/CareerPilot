@@ -1,7 +1,7 @@
 # CareerPilot Database Schema
 
 PostgreSQL 16+ with the `pgvector` extension. Models live in `apps/api/app/<domain>/models.py`;
-migrations in `apps/api/migrations/versions/`. This document describes revision `0010` (job analysis: [job-analysis.md](job-analysis.md); matching: [matching.md](matching.md); resume tailoring: [resume-tailoring.md](resume-tailoring.md); claim verification: [claim-verification.md](claim-verification.md); cover letters: [cover-letters.md](cover-letters.md)).
+migrations in `apps/api/migrations/versions/`. This document describes revision `0011` (job analysis: [job-analysis.md](job-analysis.md); matching: [matching.md](matching.md); resume tailoring: [resume-tailoring.md](resume-tailoring.md); claim verification: [claim-verification.md](claim-verification.md); cover letters: [cover-letters.md](cover-letters.md); application answers: [application-answers.md](application-answers.md)).
 
 ## 1. Core principle: evidence is the source of truth
 
@@ -160,10 +160,11 @@ erDiagram
 | --- | --- | --- |
 | `tailored_resumes` | Resume generated for one job, stored separately from uploaded `resumes` | unique (profile, job, `version`), `content jsonb` (record facts + claims with evidence IDs), `status`, `generator_name` (`rules` / `llm:<model>`), `notes jsonb`, `approved` requires `approved_at`, optional `base_resume_id`, `ai_execution_log_id`. See [resume-tailoring.md](resume-tailoring.md) |
 | `cover_letters` | Cover letter generated for one job | unique (profile, job, `version`), `content jsonb` (greeting, paragraphs of sentences with evidence IDs, closing, signature, job title/company), `status`, `generator_name`, `notes jsonb`, `ai_execution_log_id`. See [cover-letters.md](cover-letters.md) |
-| `generated_claims` | One statement in a document | belongs to **exactly one** of `tailored_resume_id` / `cover_letter_id` (`num_nonnulls(...) = 1`), `status` pending/verified/unsupported/removed. `verified`/`unsupported` follow the verification engine; statements removed during generation are kept as `removed` for audit and are never linked to evidence |
+| `generated_claims` | One statement in a document | belongs to **exactly one** of `tailored_resume_id` / `cover_letter_id` / `application_answer_id` (`num_nonnulls(...) = 1`), `status` pending/verified/unsupported/removed. `verified`/`unsupported` follow the verification engine; statements removed during generation are kept as `removed` for audit and are never linked to evidence |
 | `generated_claim_evidence` | **Traceability link** claim ↔ evidence | evidence FK is `NO ACTION DEFERRABLE INITIALLY DEFERRED` (see section 5) |
 | `claim_verifications` | Append-only verification history | `verdict`, `method` (rule_based/llm/human), `confidence` in [0, 1] |
-| `verification_reports` | Append-only report per verification run of a document | exactly one of `tailored_resume_id` / `cover_letter_id`, `trigger` generation/edit/manual, `outcome` approved/rejected, `verifier`, `report jsonb` (counts + per-claim results), `ai_execution_log_id` (SET NULL). See [claim-verification.md](claim-verification.md) |
+| `application_answers` | Answer to one application question for a job | `question`, `question_type` (motivation/fit/project/skill/experience/behavioral/other), `focus`, `position`, `max_words` 20–1000, `answer jsonb` (sentences with evidence IDs), `status`, `approved` requires `approved_at`; cascades with the job. See [application-answers.md](application-answers.md) |
+| `verification_reports` | Append-only report per verification run of a document | exactly one of `tailored_resume_id` / `cover_letter_id` / `application_answer_id`, `trigger` generation/edit/manual/approval, `outcome` approved/rejected, `verifier`, `report jsonb` (counts + per-claim results), `ai_execution_log_id` (SET NULL). See [claim-verification.md](claim-verification.md) |
 
 Document `status`: `draft → verified | verification_failed → approved → archived`.
 

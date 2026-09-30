@@ -20,9 +20,9 @@ export type ClaimResult = {
 
 export type VerificationReport = {
   id: string | null;
-  document_type: "tailored_resume" | "cover_letter" | "text";
+  document_type: "tailored_resume" | "cover_letter" | "application_answer" | "text";
   document_id: string | null;
-  trigger: "generation" | "edit" | "manual" | null;
+  trigger: "generation" | "edit" | "manual" | "approval" | null;
   created_at: string | null;
   verifier: string;
   outcome: "approved" | "rejected";

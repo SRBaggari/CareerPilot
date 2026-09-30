@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     claim_verifier: Literal["auto", "rules", "llm"] = "auto"
     # Cover letters: rule-based letter, or LLM wording. Every sentence is verified either way.
     cover_letter_generator: Literal["auto", "rules", "llm"] = "auto"
+    # Application answers: rule-based or LLM wording. Every sentence is verified either way.
+    answer_generator: Literal["auto", "rules", "llm"] = "auto"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

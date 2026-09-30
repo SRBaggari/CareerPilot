@@ -76,9 +76,11 @@ class VerificationMethod(StrEnum):
     HUMAN = "human"
 
 
-_APPROVED_HAS_TIMESTAMP = CheckConstraint(
-    "status <> 'approved' OR approved_at IS NOT NULL", "approved_has_timestamp"
-)
+def _approved_has_timestamp() -> CheckConstraint:
+    """A fresh constraint per table (a shared instance would carry one table's name)."""
+    return CheckConstraint(
+        "status <> 'approved' OR approved_at IS NOT NULL", "approved_has_timestamp"
+    )
 
 
 class TailoredResume(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -86,7 +88,7 @@ class TailoredResume(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("candidate_profile_id", "job_id", "version"),
         CheckConstraint("version >= 1", "version_positive"),
-        _APPROVED_HAS_TIMESTAMP,
+        _approved_has_timestamp(),
     )
 
     candidate_profile_id: Mapped[uuid.UUID] = fk_column("candidate_profiles.id", index=False)
@@ -124,7 +126,7 @@ class CoverLetter(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("candidate_profile_id", "job_id", "version"),
         CheckConstraint("version >= 1", "version_positive"),
-        _APPROVED_HAS_TIMESTAMP,
+        _approved_has_timestamp(),
     )
 
     candidate_profile_id: Mapped[uuid.UUID] = fk_column("candidate_profiles.id", index=False)
@@ -172,6 +174,56 @@ generated_claim_evidence = Table(
 )
 
 
+class QuestionType(StrEnum):
+    """What an application question asks for (decides what evidence to retrieve)."""
+
+    MOTIVATION = "motivation"  # "Why are you interested in this role?"
+    FIT = "fit"  # "Why should we hire you?"
+    PROJECT = "project"  # "Describe a relevant project."
+    SKILL = "skill"  # "Describe your experience with Python."
+    EXPERIENCE = "experience"  # "Tell us about your relevant experience."
+    BEHAVIORAL = "behavioral"  # "Describe a time you ..."
+    OTHER = "other"
+
+
+class ApplicationAnswer(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """An answer to one application question for a job, grounded in verified evidence."""
+
+    __tablename__ = "application_answers"
+    __table_args__ = (
+        _approved_has_timestamp(),
+        CheckConstraint("length(btrim(question)) > 0", "question_not_blank"),
+        CheckConstraint("max_words IS NULL OR max_words BETWEEN 20 AND 1000", "max_words_range"),
+        Index("ix_application_answers_profile_job", "candidate_profile_id", "job_id", "position"),
+    )
+
+    candidate_profile_id: Mapped[uuid.UUID] = fk_column("candidate_profiles.id", index=False)
+    job_id: Mapped[uuid.UUID] = fk_column("jobs.id")
+    question: Mapped[str] = mapped_column(Text)
+    question_type: Mapped[QuestionType] = enum_column(QuestionType)
+    focus: Mapped[str | None] = mapped_column(String(100))  # e.g. "Python" for a skill question
+    position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    max_words: Mapped[int | None] = mapped_column(Integer)
+    # {"sentences": [{"text", "evidence_ids", "claim_id"}]}
+    answer: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    status: Mapped[DocumentStatus] = enum_column(
+        DocumentStatus, default=DocumentStatus.DRAFT, server_default="draft"
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    generator_name: Mapped[str | None] = mapped_column(String(50))
+    notes: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    ai_execution_log_id: Mapped[uuid.UUID | None] = fk_column(
+        "ai_execution_logs.id", ondelete="SET NULL", nullable=True
+    )
+
+    job: Mapped[Job] = relationship()
+    claims: Mapped[list[GeneratedClaim]] = relationship(
+        back_populates="application_answer", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
 class GeneratedClaim(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     """One factual statement in a generated document, citing the evidence behind it.
 
@@ -182,13 +234,17 @@ class GeneratedClaim(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "generated_claims"
     __table_args__ = (
         CheckConstraint(
-            "num_nonnulls(tailored_resume_id, cover_letter_id) = 1", "exactly_one_document"
+            "num_nonnulls(tailored_resume_id, cover_letter_id, application_answer_id) = 1",
+            "exactly_one_document",
         ),
         CheckConstraint("length(btrim(claim_text)) > 0", "claim_text_not_blank"),
     )
 
     tailored_resume_id: Mapped[uuid.UUID | None] = fk_column("tailored_resumes.id", nullable=True)
     cover_letter_id: Mapped[uuid.UUID | None] = fk_column("cover_letters.id", nullable=True)
+    application_answer_id: Mapped[uuid.UUID | None] = fk_column(
+        "application_answers.id", nullable=True
+    )
     claim_text: Mapped[str] = mapped_column(Text)
     section: Mapped[str | None] = mapped_column(String(50))  # e.g. "summary", "experience"
     position: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
@@ -198,6 +254,7 @@ class GeneratedClaim(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     tailored_resume: Mapped[TailoredResume | None] = relationship(back_populates="claims")
     cover_letter: Mapped[CoverLetter | None] = relationship(back_populates="claims")
+    application_answer: Mapped[ApplicationAnswer | None] = relationship(back_populates="claims")
     evidence: Mapped[list[CandidateEvidence]] = relationship(secondary=generated_claim_evidence)
     verifications: Mapped[list[ClaimVerification]] = relationship(
         back_populates="claim",

@@ -5,6 +5,7 @@ from app.ai.models import AIExecutionLog
 from app.applications.models import Application, ApplicationStatusHistory, FollowUp, Interview
 from app.db.base import Base
 from app.documents.models import (
+    ApplicationAnswer,
     ClaimVerification,
     CoverLetter,
     GeneratedClaim,
@@ -34,6 +35,7 @@ __all__ = [
     "AIExecutionLog",
     "Achievement",
     "Application",
+    "ApplicationAnswer",
     "ApplicationStatusHistory",
     "Base",
     "CandidateEvidence",

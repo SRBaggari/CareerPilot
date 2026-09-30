@@ -125,7 +125,7 @@ def frame(item: EvidenceItem, ws: Workspace, *, follow_up: bool = False) -> str 
         return f"As {_article(job.title)} {job.title} at {job.company_name}, {action}."
     if (project := projects.get(item.subject_id)) is not None:  # type: ignore[arg-type]
         return f"In my {project.title} project, {action}."
-    return None
+    return f"{action}."  # other items (education, achievements): the action on its own
 
 
 def _strongest_evidence(ws: Workspace, report: MatchReportOut | None) -> list[EvidenceItem]:

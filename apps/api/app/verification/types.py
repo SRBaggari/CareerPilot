@@ -20,6 +20,7 @@ class ClaimType(StrEnum):
     PROJECT = "project"  # a bullet under a project
     STATEMENT = "statement"  # free text (e.g. pasted into the checker)
     LETTER = "letter"  # a cover letter sentence: a factual claim, or intent / courtesy
+    ANSWER = "answer"  # an application answer sentence: a factual claim, or intent
     # Record facts, checked against the stored profile.
     CONTACT = "contact"
     EMPLOYMENT = "employment"
@@ -95,7 +96,7 @@ class ClaimResult(BaseModel):
 
 class VerificationReportOut(BaseModel):
     id: uuid.UUID | None = None  # None for checks that aren't stored
-    document_type: Literal["tailored_resume", "cover_letter", "text"]
+    document_type: Literal["tailored_resume", "cover_letter", "application_answer", "text"]
     document_id: uuid.UUID | None = None
     trigger: VerificationTrigger | None = None
     created_at: datetime | None = None
@@ -110,7 +111,7 @@ def build_report(
     results: list[ClaimResult],
     *,
     verifier: str,
-    document_type: Literal["tailored_resume", "cover_letter", "text"],
+    document_type: Literal["tailored_resume", "cover_letter", "application_answer", "text"],
     warnings: list[str] | None = None,
 ) -> VerificationReportOut:
     counts = {v: sum(1 for r in results if r.verification_status == v) for v in VerificationVerdict}
