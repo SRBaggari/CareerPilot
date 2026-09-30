@@ -9,6 +9,7 @@ from app.api.routes import (
     jobs,
     matching,
     profile,
+    recommendations,
     resumes,
     tailored_resumes,
     verification,
@@ -26,3 +27,4 @@ api_router.include_router(verification.router)
 api_router.include_router(cover_letters.router)
 api_router.include_router(application_answers.router)
 api_router.include_router(discovery.router)
+api_router.include_router(recommendations.router)

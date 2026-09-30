@@ -25,7 +25,7 @@ from app.discovery.schemas import (
     SourceOut,
 )
 from app.jobs import service as jobs
-from app.jobs.models import Job
+from app.jobs.models import Job, JobSource
 from app.jobs.schemas import JobAnalyzeIn
 from app.users.models import User
 
@@ -116,22 +116,21 @@ async def get(
     )
 
 
-async def import_job(
+async def import_posting(
     session: AsyncSession,
     user: User,
-    registry: ProviderRegistry,
-    source: str,
-    identifier: str,
+    posting: NormalizedJob,
+    job_source: JobSource,
     settings: Settings,
     llm: LLMProvider | None,
 ) -> ImportResultOut:
-    """Import a posting as one of the user's jobs (once), analyzed like a pasted one."""
-    posting = await _fetch(registry, source, identifier)
-    existing = (await _imported(session, user, [posting])).get((source, identifier))
+    """Import a normalized posting as one of the user's jobs (once), analyzed like a pasted
+    description. The source's structured fields take precedence over extracted ones."""
+    existing = (await _imported(session, user, [posting])).get(
+        (posting.source, posting.source_identifier)
+    )
     if existing is not None:
         return ImportResultOut(job_id=existing, created=False)
-    provider = registry.get(source)
-    assert provider is not None  # noqa: S101 - _fetch checked it
     payload = JobAnalyzeIn(
         description=posting.description,
         source_url=posting.url,
@@ -146,7 +145,7 @@ async def import_job(
         settings,
         llm,
         provenance=jobs.Provenance(
-            source=provider.job_source,
+            source=job_source,
             source_name=posting.source,
             external_id=posting.source_identifier,
             workplace_type=posting.work_mode,
@@ -156,3 +155,19 @@ async def import_job(
         ),
     )
     return ImportResultOut(job_id=created.id, created=True)
+
+
+async def import_job(
+    session: AsyncSession,
+    user: User,
+    registry: ProviderRegistry,
+    source: str,
+    identifier: str,
+    settings: Settings,
+    llm: LLMProvider | None,
+) -> ImportResultOut:
+    """Fetch a posting from its source and import it."""
+    posting = await _fetch(registry, source, identifier)
+    provider = registry.get(source)
+    assert provider is not None  # noqa: S101 - _fetch checked it
+    return await import_posting(session, user, posting, provider.job_source, settings, llm)

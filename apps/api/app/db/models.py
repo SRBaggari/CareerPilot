@@ -28,6 +28,7 @@ from app.profiles.models import (
     WorkExperience,
     candidate_evidence_skills,
 )
+from app.recommendations.models import JobRecommendation
 from app.users.models import User
 from app.verification.models import VerificationReport
 
@@ -51,6 +52,7 @@ __all__ = [
     "Interview",
     "Job",
     "JobMatch",
+    "JobRecommendation",
     "JobRequirement",
     "Project",
     "RequirementMatch",

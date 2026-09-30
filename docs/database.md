@@ -1,7 +1,7 @@
 # CareerPilot Database Schema
 
 PostgreSQL 16+ with the `pgvector` extension. Models live in `apps/api/app/<domain>/models.py`;
-migrations in `apps/api/migrations/versions/`. This document describes revision `0012` (job analysis: [job-analysis.md](job-analysis.md); matching: [matching.md](matching.md); resume tailoring: [resume-tailoring.md](resume-tailoring.md); claim verification: [claim-verification.md](claim-verification.md); cover letters: [cover-letters.md](cover-letters.md); application answers: [application-answers.md](application-answers.md); job discovery: [job-discovery.md](job-discovery.md)).
+migrations in `apps/api/migrations/versions/`. This document describes revision `0013` (job analysis: [job-analysis.md](job-analysis.md); matching: [matching.md](matching.md); resume tailoring: [resume-tailoring.md](resume-tailoring.md); claim verification: [claim-verification.md](claim-verification.md); cover letters: [cover-letters.md](cover-letters.md); application answers: [application-answers.md](application-answers.md); job discovery: [job-discovery.md](job-discovery.md); recommendations: [recommendations.md](recommendations.md)).
 
 ## 1. Core principle: evidence is the source of truth
 
@@ -163,6 +163,7 @@ erDiagram
 | `generated_claims` | One statement in a document | belongs to **exactly one** of `tailored_resume_id` / `cover_letter_id` / `application_answer_id` (`num_nonnulls(...) = 1`), `status` pending/verified/unsupported/removed. `verified`/`unsupported` follow the verification engine; statements removed during generation are kept as `removed` for audit and are never linked to evidence |
 | `generated_claim_evidence` | **Traceability link** claim ↔ evidence | evidence FK is `NO ACTION DEFERRABLE INITIALLY DEFERRED` (see section 5) |
 | `claim_verifications` | Append-only verification history | `verdict`, `method` (rule_based/llm/human), `confidence` in [0, 1] |
+| `job_recommendations` | One explained recommendation per (candidate, source, posting) | posting snapshot, `status` new/saved/ignored, `eligible` + `exclusions` + `concerns`, `explanation jsonb`, coverage and `rank`, profile fingerprint, `job_id` (SET NULL) once analyzed. See [recommendations.md](recommendations.md) |
 | `application_answers` | Answer to one application question for a job | `question`, `question_type` (motivation/fit/project/skill/experience/behavioral/other), `focus`, `position`, `max_words` 20–1000, `answer jsonb` (sentences with evidence IDs), `status`, `approved` requires `approved_at`; cascades with the job. See [application-answers.md](application-answers.md) |
 | `verification_reports` | Append-only report per verification run of a document | exactly one of `tailored_resume_id` / `cover_letter_id` / `application_answer_id`, `trigger` generation/edit/manual/approval, `outcome` approved/rejected, `verifier`, `report jsonb` (counts + per-claim results), `ai_execution_log_id` (SET NULL). See [claim-verification.md](claim-verification.md) |
 
