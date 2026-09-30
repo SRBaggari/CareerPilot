@@ -124,7 +124,7 @@ class LLMProvider(Protocol):
 are two adapters: an offline hashing embedder (the default, used in tests) and Voyage AI. See
 [evidence-retrieval.md](evidence-retrieval.md).
 
-## 5. Evidence and claim traceability _(schema implemented; generation planned)_
+## 5. Evidence and claim traceability _(implemented for tailored resumes)_
 
 This is the core integrity guarantee, so it is designed into the data model from the start:
 
@@ -136,6 +136,12 @@ This is the core integrity guarantee, so it is designed into the data model from
    that cited evidence actually supports the claim. Unsupported claims are removed or flagged
    for the user; they are never silently kept.
 4. Generated documents store their claim → evidence mapping so the user can audit any line.
+
+Tailored resumes implement this as a claim-first pipeline. Record facts (employers, titles,
+dates, degrees, certifications) are copied from the profile by ID and never generated. Every
+generated claim is verified against the evidence it cites. Unsupported bullets are rewritten
+to that evidence verbatim; everything else unsupported is rejected and audited. See
+[resume-tailoring.md](resume-tailoring.md).
 
 ## 6. Human-in-the-loop and automation safety _(approval guard implemented; automation planned)_
 
@@ -189,6 +195,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 3a    | Evidence RAG: embeddings, pgvector search, verified-only retrieval (**done**) |
 | 3b    | Job description analysis: structured extraction, no inference (**done**) |
 | 4     | Candidate-job matching: grounded, explainable evidence coverage (**done**) |
+| 5a    | Resume tailoring: claim-first generation, verification, edit, PDF/DOCX (**done**) |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

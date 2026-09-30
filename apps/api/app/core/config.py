@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     job_analyzer: Literal["auto", "heuristic", "llm"] = "auto"
     # Candidate-job matching judge: rules only, or an LLM grounded against retrieved evidence.
     match_judge: Literal["auto", "rules", "llm"] = "auto"
+    # Tailored resumes: rules only, or LLM wording. Every claim is verified either way.
+    resume_generator: Literal["auto", "rules", "llm"] = "auto"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

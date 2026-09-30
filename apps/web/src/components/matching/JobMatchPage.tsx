@@ -53,14 +53,24 @@ export function JobMatchPage({ jobId }: { jobId: string }) {
     state.status === "ready" ? `${state.report.job_title} · ${state.report.company_name}` : null;
   return (
     <div className="space-y-6">
-      <div>
-        <Link href={`/jobs/${jobId}`} className="text-sm text-zinc-500 hover:underline">
-          ← Job analysis
-        </Link>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-          Job match
-        </h1>
-        {title ? <p className="text-zinc-600 dark:text-zinc-400">{title}</p> : null}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <Link href={`/jobs/${jobId}`} className="text-sm text-zinc-500 hover:underline">
+            ← Job analysis
+          </Link>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Job match
+          </h1>
+          {title ? <p className="text-zinc-600 dark:text-zinc-400">{title}</p> : null}
+        </div>
+        {state.status === "ready" ? (
+          <Link
+            href={`/jobs/${jobId}/resume`}
+            className="inline-flex items-center rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            Tailor my resume
+          </Link>
+        ) : null}
       </div>
       {error ? (
         <p

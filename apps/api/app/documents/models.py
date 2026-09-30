@@ -31,6 +31,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -104,6 +105,11 @@ class TailoredResume(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ai_execution_log_id: Mapped[uuid.UUID | None] = fk_column(
         "ai_execution_logs.id", ondelete="SET NULL", nullable=True
+    )
+    generator_name: Mapped[str | None] = mapped_column(String(50))  # "rules" / "llm:<model>"
+    # Notes for the candidate, e.g. skills left out because no evidence supports them.
+    notes: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
     )
 
     job: Mapped[Job] = relationship()

@@ -1,7 +1,7 @@
 # CareerPilot Database Schema
 
 PostgreSQL 16+ with the `pgvector` extension. Models live in `apps/api/app/<domain>/models.py`;
-migrations in `apps/api/migrations/versions/`. This document describes revision `0007` (job analysis: [job-analysis.md](job-analysis.md); matching: [matching.md](matching.md)).
+migrations in `apps/api/migrations/versions/`. This document describes revision `0008` (job analysis: [job-analysis.md](job-analysis.md); matching: [matching.md](matching.md); resume tailoring: [resume-tailoring.md](resume-tailoring.md)).
 
 ## 1. Core principle: evidence is the source of truth
 
@@ -157,9 +157,9 @@ erDiagram
 
 | Table | Purpose | Notable columns and constraints |
 | --- | --- | --- |
-| `tailored_resumes` | Resume generated for one job | unique (profile, job, `version`), `content jsonb`, `status`, `approved` requires `approved_at`, optional `base_resume_id`, `ai_execution_log_id` |
+| `tailored_resumes` | Resume generated for one job, stored separately from uploaded `resumes` | unique (profile, job, `version`), `content jsonb` (record facts + claims with evidence IDs), `status`, `generator_name` (`rules` / `llm:<model>`), `notes jsonb`, `approved` requires `approved_at`, optional `base_resume_id`, `ai_execution_log_id`. See [resume-tailoring.md](resume-tailoring.md) |
 | `cover_letters` | Cover letter generated for one job | same versioning and approval rules, `content text` |
-| `generated_claims` | One statement in a document | belongs to **exactly one** of `tailored_resume_id` / `cover_letter_id` (`num_nonnulls(...) = 1`), `status` pending/verified/unsupported/removed |
+| `generated_claims` | One statement in a document | belongs to **exactly one** of `tailored_resume_id` / `cover_letter_id` (`num_nonnulls(...) = 1`), `status` pending/verified/unsupported/removed. Rejected or rewritten originals are kept as `unsupported` for audit and are never linked to evidence |
 | `generated_claim_evidence` | **Traceability link** claim ↔ evidence | evidence FK is `NO ACTION DEFERRABLE INITIALLY DEFERRED` (see section 5) |
 | `claim_verifications` | Append-only verification history | `verdict`, `method` (rule_based/llm/human), `confidence` in [0, 1] |
 
