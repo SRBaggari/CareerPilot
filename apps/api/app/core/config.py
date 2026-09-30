@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     # Claim verification: rule checks only, or rules plus an LLM reviewer. The reviewer can
     # make any verdict stricter, but can't overrule a hard factual failure.
     claim_verifier: Literal["auto", "rules", "llm"] = "auto"
+    # Cover letters: rule-based letter, or LLM wording. Every sentence is verified either way.
+    cover_letter_generator: Literal["auto", "rules", "llm"] = "auto"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

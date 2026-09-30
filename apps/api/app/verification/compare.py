@@ -195,6 +195,9 @@ _STOPWORDS = frozenset(
         "before",
         "while",
         "during",
+        "have",
+        "has",
+        "had",
     ]
 )
 # Words that only describe *how* something was done; rewording them adds no new fact.
@@ -246,6 +249,43 @@ _GENERIC = frozenset(
     ]
 )
 _SENTENCE_START = re.compile(r"(?:^|[.!?]\s+|[:;]\s+)([A-Z][\w'-]*)")
+# Generic self-praise: presented as fact, it needs evidence like any other claim.
+_TRAITS = re.compile(
+    r"\b(passionate|hard[- ]?working|detail[- ]oriented|results[- ](?:driven|oriented)|"
+    r"self[- ](?:motivated|starter)|motivated|dedicated|team[- ]player|quick learner|"
+    r"fast learner|go[- ]getter|proactive|dynamic|innovative|creative|visionary|talented|"
+    r"exceptional|outstanding|excellent|strong|proven|track record|extensive|seasoned|"
+    r"skilled|proficient|adept|expertise|deep knowledge|world[- ]class|rockstar|ninja|"
+    r"communication skills|interpersonal skills|leadership skills|problem[- ]solver)\b",
+    re.IGNORECASE,
+)
+# Openers of sentences that state intent, interest or courtesy rather than facts.
+_INTENT_OPENERS = re.compile(
+    r"^\s*(dear\b|sincerely|best regards|kind regards|regards|yours|thank you|thanks\b|"
+    r"i am writing|i'm writing|i am applying|i'm applying|i am excited|i'm excited|"
+    r"i am eager|i'm eager|i am interested|i'm interested|i would|i'd\b|i look forward|"
+    r"i hope|i welcome|please)",
+    re.IGNORECASE,
+)
+# Capitalized words a salutation may use ("Dear Northwind Hiring Team,").
+_SALUTATION_WORDS = frozenset(
+    {"hiring", "team", "manager", "committee", "recruiter", "recruiting", "sir", "madam",
+     "talent", "acquisition", "whom", "it", "may", "concern", "the", "people"}
+)  # fmt: skip
+_SIGN_OFF_WORDS = frozenset(
+    {"dear", "sincerely", "best", "kind", "regards", "yours", "faithfully", "truly", "and",
+     "of", "at", "for"}
+)  # fmt: skip
+# Wording that turns a sentence into a statement about the candidate's past or abilities.
+_FACT_WORDING = re.compile(
+    r"\b(?:i|i've|we)\s+(?:have|had|'ve|built|led|developed|created|designed|managed|"
+    r"worked|implemented|deployed|delivered|achieved|won|earned|hold|completed|graduated|"
+    r"studied|shipped|launched|reduced|increased|improved|trained|mentored|taught|wrote|"
+    r"published|founded|own|owned|bring|brought|can|know|am\s+(?:a|an|the)\b)|"
+    r"\bmy\s+(?:experience|background|work|skills?|expertise|track record|projects?|"
+    r"role|achievements?|degree|studies|research|internship|knowledge|ability)\b",
+    re.IGNORECASE,
+)
 
 
 def _norm_number(raw: str) -> str:
@@ -417,6 +457,17 @@ def compare(text: str, evidence: list[EvidenceText], kind: ClaimKind) -> Compari
             verdict, f"Names technologies not in the evidence: {listed}.", coverage / 2, True
         )
 
+    traits = sorted({t.lower() for t in _TRAITS.findall(text)} - set(support_lower.split()))
+    traits = [t for t in traits if t not in support_lower]
+    if traits:
+        listed = ", ".join(traits)
+        return Comparison(
+            V.UNSUPPORTED,
+            f"Presents a generic quality as fact ({listed}); your evidence doesn't show it.",
+            0.0,
+            True,
+        )
+
     qualifiers = {q.lower() for q in _QUALIFIERS.findall(text)} - support_words
     qualifiers = {q for q in qualifiers if q not in support_lower}
     if qualifiers:
@@ -435,3 +486,38 @@ def compare(text: str, evidence: list[EvidenceText], kind: ClaimKind) -> Compari
     return Comparison(
         verdict, f"Adds wording not backed by the evidence: {new}.", round(coverage, 2)
     )
+
+
+def is_non_factual(text: str, allowed_names: set[str]) -> bool:
+    """True for a greeting, statement of intent or courtesy that claims nothing about the
+    candidate ("I am writing to apply for the ML Engineer role at Northwind.").
+
+    Deliberately strict: numbers, technologies, generic qualities, statements about the
+    candidate's past or abilities, or names other than ``allowed_names`` (the job title
+    and company) make it a factual claim, which then needs evidence.
+    """
+    if not _INTENT_OPENERS.match(text):
+        return False
+    if numbers(text) or _TRAITS.search(text) or _FACT_WORDING.search(text):
+        return False
+    if _QUALIFIERS.search(text) or _VAGUE_QUANTITIES.search(text):
+        return False
+    allowed_words = {w.lower() for name in allowed_names for w in re.findall(r"[\w'&.+-]+", name)}
+    allowed_words |= _SALUTATION_WORDS
+    # Role words are fine when they are the job's own title ("Senior ... Engineer").
+    if any(w in _ESCALATION and w not in allowed_words for w in words(text)):
+        return False
+    # A salutation or sign-off names the company or role and nothing else.
+    if re.match(r"\s*(dear|sincerely|best regards|kind regards|regards|yours)\b", text, re.I):
+        extra = set(words(text)) - allowed_words - _SIGN_OFF_WORDS
+        if extra:
+            return False
+    allowed_tech = {t for name in allowed_names for t in find_technologies(name)}
+    if set(find_technologies(text)) - allowed_tech:
+        return False
+    names = {
+        n
+        for n in _proper_nouns(text)
+        if n != "I" and n.lower().removesuffix("'s").removesuffix("'") not in allowed_words
+    }
+    return not names

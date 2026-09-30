@@ -202,6 +202,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 4     | Candidate-job matching: grounded, explainable evidence coverage (**done**) |
 | 5a    | Resume tailoring: claim-first generation, verification, edit, PDF/DOCX (**done**) |
 | 5b    | Claim verification engine: independent, 4 statuses, reports, re-verify (**done**) |
+| 5c    | Cover letters: grounded generation, verify, regenerate or remove, edit, PDF/DOCX (**done**) |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

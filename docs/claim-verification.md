@@ -31,7 +31,7 @@ Generated document
 | Field | Meaning |
 | --- | --- |
 | `claim_text` | The statement as written |
-| `claim_type` | Generated claims are `summary`, `skill`, `experience` (a job bullet), `project` (a project bullet) or `statement` (free text). Record facts are `contact`, `employment`, `project_entry`, `education`, `certification`, `achievement` or `coursework`. |
+| `claim_type` | Generated claims are `summary`, `skill`, `experience` (a job bullet), `project` (a project bullet), `letter` (a cover letter sentence) or `statement` (free text). Record facts are `contact`, `employment`, `project_entry`, `education`, `certification`, `achievement` or `coursework`. |
 | `evidence_ids` | The evidence the verdict rests on. `cited_evidence_ids` holds what the claim cited. |
 | `evidence_source` | `cited`, `retrieved` (the claim didn't cite the evidence that supports it), `profile` (checked against stored records) or `none` |
 | `verification_status` | One of the four statuses below |
@@ -56,6 +56,10 @@ Examples of CONTRADICTED:
 - A more senior title at a recorded employer.
 - A year outside the dates of the item the claim sits under.
 - A record fact (name, employer, title, dates, degree, certification) that differs from the profile.
+
+**Generic self-praise** presented as fact ("passionate", "team player", "strong communication skills", "proven track record") is UNSUPPORTED unless the evidence says it.
+
+**Cover letter sentences** (`letter`) may also be non-factual: a greeting, intent or courtesy. The engine approves one without evidence only if it states nothing about the candidate: no numbers, technologies, qualities, qualifiers or role words, no "I have…" or "my experience…", and no names other than the job and company. Anything else is verified like any claim. See [cover-letters.md](cover-letters.md).
 
 Numbers are compared by what they measure: the few words just before them. A real number
 from the evidence can't be attached to something else. "Reduced cloud costs by 30%" is

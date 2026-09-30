@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     candidate_evidence,
+    cover_letters,
     health,
     jobs,
     matching,
@@ -20,3 +21,4 @@ api_router.include_router(jobs.router)
 api_router.include_router(matching.router)
 api_router.include_router(tailored_resumes.router)
 api_router.include_router(verification.router)
+api_router.include_router(cover_letters.router)

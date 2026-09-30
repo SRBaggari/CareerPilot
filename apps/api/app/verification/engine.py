@@ -29,7 +29,7 @@ from app.core.config import Settings
 from app.documents.models import VerificationVerdict
 from app.retrieval.service import retrieve_verified_for_queries
 from app.users.models import User
-from app.verification.compare import ClaimKind, Comparison, compare
+from app.verification.compare import ClaimKind, Comparison, compare, is_non_factual
 from app.verification.knowledge import (
     CandidateKnowledge,
     Evidence,
@@ -121,6 +121,15 @@ def assess(
         supported = check.verdict == V.SUPPORTED
         result = _result(claim, check.verdict, check.reason, confidence=1.0 if supported else 0.0,
                          source="profile")  # fmt: skip
+        return Assessment(result, veto=True, offered={})
+
+    if claim.claim_type == ClaimType.LETTER and is_non_factual(
+        claim.text, set((claim.facts or {}).get("allowed_names", []))
+    ):
+        result = _result(
+            claim, V.SUPPORTED, "Not a factual claim about you: a greeting, statement of "
+            "interest or courtesy.", confidence=1.0,
+        )  # fmt: skip
         return Assessment(result, veto=True, offered={})
 
     scope = knowledge.scope(claim)

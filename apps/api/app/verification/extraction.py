@@ -7,6 +7,7 @@ generated.
 
 import re
 
+from app.documents.cover_letter.content import CoverLetterContent
 from app.documents.resume.content import ResumeContent
 from app.verification.types import ClaimInput, ClaimType
 
@@ -96,6 +97,46 @@ def extract_resume_claims(content: ResumeContent) -> list[ClaimInput]:
 
 _BULLET = re.compile(r"^\s*(?:[-*\u2022\u25aa\u2013]|\d+[.)])\s+")
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'\u201c(])")
+
+
+def split_sentences(text: str) -> list[str]:
+    """Sentences of a paragraph or bullet list, in order."""
+    found: list[str] = []
+    for line in text.splitlines():
+        line = _BULLET.sub("", line).strip()
+        found += [s.strip() for s in _SENTENCE_END.split(line) if len(s.strip()) >= 3]
+    return found
+
+
+def extract_cover_letter_claims(content: CoverLetterContent) -> list[ClaimInput]:
+    """The signature (checked against the profile) and every sentence of the letter.
+
+    Greeting, body and closing are all extracted: the engine decides which sentences make
+    factual claims and which only state intent or courtesy.
+    """
+    allowed = {"allowed_names": [content.job_title, content.company_name]}
+    claims = [
+        ClaimInput(
+            text=content.signature.full_name,
+            claim_type=ClaimType.CONTACT,
+            section="signature",
+            facts=content.signature.model_dump(),
+        ),
+        ClaimInput(content.greeting, ClaimType.LETTER, section="greeting", facts=allowed),
+    ]
+    for section, position, sentence in content.sentences():
+        claims.append(
+            ClaimInput(
+                sentence.text,
+                ClaimType.LETTER,
+                list(sentence.evidence_ids),
+                section,
+                position,
+                facts=allowed,
+            )
+        )
+    claims.append(ClaimInput(content.closing, ClaimType.LETTER, section="closing", facts=allowed))
+    return claims
 
 
 def extract_text_claims(text: str) -> list[ClaimInput]:

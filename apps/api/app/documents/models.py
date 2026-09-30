@@ -133,12 +133,17 @@ class CoverLetter(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     status: Mapped[DocumentStatus] = enum_column(
         DocumentStatus, default=DocumentStatus.DRAFT, server_default="draft"
     )
-    content: Mapped[str] = mapped_column(Text)
+    # Structured letter (greeting, paragraphs of sentences with evidence IDs, closing).
+    content: Mapped[dict[str, Any]] = mapped_column(JSONB)
     file_format: Mapped[DocumentFormat | None] = enum_column(DocumentFormat)
     storage_key: Mapped[str | None] = mapped_column(Text)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     ai_execution_log_id: Mapped[uuid.UUID | None] = fk_column(
         "ai_execution_logs.id", ondelete="SET NULL", nullable=True
+    )
+    generator_name: Mapped[str | None] = mapped_column(String(50))  # "rules" / "llm:<model>"
+    notes: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
     )
 
     job: Mapped[Job] = relationship()

@@ -26,12 +26,14 @@ async def store_report(
     session: AsyncSession,
     report: VerificationReportOut,
     *,
-    tailored_resume_id: uuid.UUID,
+    tailored_resume_id: uuid.UUID | None = None,
+    cover_letter_id: uuid.UUID | None = None,
     trigger: VerificationTrigger,
     ai_execution_log_id: uuid.UUID | None,
 ) -> VerificationReport:
     row = VerificationReport(
         tailored_resume_id=tailored_resume_id,
+        cover_letter_id=cover_letter_id,
         trigger=trigger,
         outcome=report.outcome,
         verifier=report.verifier[:100],
@@ -50,8 +52,8 @@ def report_out(row: VerificationReport) -> VerificationReportOut:
         {
             **row.report,
             "id": row.id,
-            "document_type": "tailored_resume",
-            "document_id": row.tailored_resume_id,
+            "document_type": "tailored_resume" if row.tailored_resume_id else "cover_letter",
+            "document_id": row.tailored_resume_id or row.cover_letter_id,
             "trigger": row.trigger,
             "created_at": row.created_at,
             "verifier": row.verifier,
@@ -61,11 +63,20 @@ def report_out(row: VerificationReport) -> VerificationReportOut:
 
 
 async def reports_for(
-    session: AsyncSession, tailored_resume_id: uuid.UUID
+    session: AsyncSession,
+    tailored_resume_id: uuid.UUID | None = None,
+    *,
+    cover_letter_id: uuid.UUID | None = None,
 ) -> list[VerificationReportOut]:
+    """Every report for one document, newest first."""
+    document = (
+        VerificationReport.tailored_resume_id == tailored_resume_id
+        if tailored_resume_id is not None
+        else VerificationReport.cover_letter_id == cover_letter_id
+    )
     rows = await session.scalars(
         select(VerificationReport)
-        .where(VerificationReport.tailored_resume_id == tailored_resume_id)
+        .where(document)
         .order_by(VerificationReport.created_at.desc(), VerificationReport.id)
     )
     return [report_out(r) for r in rows]

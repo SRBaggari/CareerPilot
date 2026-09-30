@@ -20,7 +20,7 @@ export type ClaimResult = {
 
 export type VerificationReport = {
   id: string | null;
-  document_type: "tailored_resume" | "text";
+  document_type: "tailored_resume" | "cover_letter" | "text";
   document_id: string | null;
   trigger: "generation" | "edit" | "manual" | null;
   created_at: string | null;

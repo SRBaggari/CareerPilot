@@ -64,12 +64,20 @@ export function JobMatchPage({ jobId }: { jobId: string }) {
           {title ? <p className="text-zinc-600 dark:text-zinc-400">{title}</p> : null}
         </div>
         {state.status === "ready" ? (
-          <Link
-            href={`/jobs/${jobId}/resume`}
-            className="inline-flex items-center rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
-          >
-            Tailor my resume
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href={`/jobs/${jobId}/resume`}
+              className="inline-flex items-center rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
+            >
+              Tailor my resume
+            </Link>
+            <Link
+              href={`/jobs/${jobId}/cover-letter`}
+              className="inline-flex items-center rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-800 hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Write a cover letter
+            </Link>
+          </div>
         ) : null}
       </div>
       {error ? (
