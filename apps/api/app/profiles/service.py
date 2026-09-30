@@ -33,6 +33,7 @@ from app.profiles.models import (
     ProfileSuggestion,
     Project,
     Skill,
+    SkillCategory,
     SuggestionStatus,
     WorkExperience,
 )
@@ -463,22 +464,29 @@ def normalize_skill_name(name: str) -> str:
     return " ".join(name.lower().split())
 
 
-async def add_skill(
-    session: AsyncSession, user: User, payload: SkillIn, *, commit: bool = True
-) -> SkillOut:
-    profile = await get_profile(session, user)
-    normalized = normalize_skill_name(payload.name)
-    # The skill vocabulary is shared: reuse an existing entry, never rename it.
+async def get_or_create_skill(
+    session: AsyncSession, name: str, category: SkillCategory | None
+) -> Skill:
+    """The shared vocabulary entry for ``name``: reused if it exists, never renamed."""
+    normalized = normalize_skill_name(name)
     await session.execute(
         insert(Skill)
-        .values(name=payload.name, normalized_name=normalized, category=payload.category)
+        .values(name=name, normalized_name=normalized, category=category)
         .on_conflict_do_nothing(index_elements=["normalized_name"])
     )
     skill = await session.scalar(select(Skill).where(Skill.normalized_name == normalized))
     if skill is None:  # pragma: no cover - the upsert above guarantees a row
         raise ConflictError("Could not register the skill; please retry.")
-    if skill.category is None and payload.category is not None:
-        skill.category = payload.category
+    if skill.category is None and category is not None:
+        skill.category = category
+    return skill
+
+
+async def add_skill(
+    session: AsyncSession, user: User, payload: SkillIn, *, commit: bool = True
+) -> SkillOut:
+    profile = await get_profile(session, user)
+    skill = await get_or_create_skill(session, payload.name, payload.category)
 
     duplicate = await session.scalar(
         select(CandidateSkill.id).where(

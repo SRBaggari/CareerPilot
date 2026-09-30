@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     max_resume_bytes: int = Field(default=5 * 1024 * 1024, gt=0)
     # "auto": use the LLM parser when an API key is configured, else the rule-based parser.
     resume_parser: Literal["auto", "heuristic", "llm"] = "auto"
+    # Job description analysis: same choice as the resume parser.
+    job_analyzer: Literal["auto", "heuristic", "llm"] = "auto"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

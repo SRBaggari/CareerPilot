@@ -27,6 +27,12 @@ export default function Home() {
             CareerPilot
           </span>
           <Link
+            href="/jobs"
+            className="mr-2 ml-auto rounded-md px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
+          >
+            Analyze a job
+          </Link>
+          <Link
             href="/profile"
             className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"
           >

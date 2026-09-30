@@ -44,6 +44,16 @@ class FieldValidationError(DomainError):
         self.field = field
 
 
+class FieldErrors(DomainError):
+    """Several field-level validation failures, reported together (HTTP 422)."""
+
+    status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
+
+    def __init__(self, errors: dict[str, str]) -> None:
+        super().__init__("; ".join(errors.values()))
+        self.errors = errors
+
+
 def _validation_detail(field: str, message: str) -> list[dict[str, Any]]:
     return [{"type": "value_error", "loc": ["body", field], "msg": message}]
 
@@ -53,6 +63,8 @@ def register_error_handlers(app: FastAPI) -> None:
     async def _domain(_: Request, exc: DomainError) -> JSONResponse:
         if isinstance(exc, FieldValidationError):
             detail: Any = _validation_detail(exc.field, exc.message)
+        elif isinstance(exc, FieldErrors):
+            detail = [e for f, m in exc.errors.items() for e in _validation_detail(f, m)]
         else:
             detail = exc.message
         return JSONResponse(status_code=exc.status_code, content={"detail": detail})

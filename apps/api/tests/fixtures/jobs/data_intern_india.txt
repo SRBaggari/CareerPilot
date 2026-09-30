@@ -1,0 +1,24 @@
+Job Title: Data Science Intern
+Company: Pinecrest Analytics Pvt Ltd
+Location: Bengaluru, India
+Work mode: Hybrid (3 days in office)
+Job Type: Internship (6 months)
+
+Key Responsibilities
+- Clean and analyse customer datasets using Pandas and SQL.
+- Build dashboards in Power BI for the sales team.
+
+Eligibility Criteria
+- B.Tech / M.Tech students graduating in 2026.
+- Minimum CGPA of 7.0 with no active backlogs.
+
+Skills Required
+- Python programming.
+- Good understanding of statistics and machine learning fundamentals.
+- Excellent written and verbal communication in English.
+
+Good to have
+- Knowledge of scikit-learn or TensorFlow.
+
+Stipend: Rs. 40,000 per month
+Last date to apply: 15/08/2026

@@ -91,3 +91,31 @@ async def test_check_constraints_match_models(db: AsyncSession) -> None:
         )
     )
     assert actual == expected
+
+
+async def test_enum_checks_allow_exactly_the_model_values(db: AsyncSession) -> None:
+    """Catches migrations that forget to update a CHECK when enum values change."""
+    import re
+    from enum import StrEnum
+
+    from sqlalchemy import Enum
+
+    definitions: dict[str, str] = dict(
+        (
+            await db.execute(
+                text(
+                    "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint "
+                    r"WHERE contype = 'c' AND conname LIKE '%\_enum'"
+                )
+            )
+        ).all()
+    )
+    for table in Base.metadata.tables.values():
+        for column in table.c:
+            if not isinstance(column.type, Enum) or column.type.enum_class is None:
+                continue
+            enum_cls = column.type.enum_class
+            definition = definitions[f"ck_{table.name}_{column.name}_enum"]
+            allowed = set(re.findall(r"'([a-z_]+)'", definition))
+            assert issubclass(enum_cls, StrEnum)
+            assert allowed == {m.value for m in enum_cls}, (table.name, column.name)

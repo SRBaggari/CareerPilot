@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
+import { AppHeader } from "@/components/AppHeader";
 import { Button, Card } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { createProfile, deleteProfile, getProfile, type Profile } from "@/lib/api/profile";
@@ -73,14 +73,7 @@ export function ProfileDashboard() {
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <header className="sticky top-0 z-10 border-b border-zinc-200 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <Link href="/" className="font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            CareerPilot
-          </Link>
-          <span className="text-sm text-zinc-500">Master profile</span>
-        </div>
-      </header>
+      <AppHeader current="/profile" />
 
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
         {state.status === "loading" ? (

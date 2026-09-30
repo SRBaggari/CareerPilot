@@ -7,13 +7,14 @@ about a job (matches, documents, applications) lives in per-candidate tables.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Index,
     Integer,
@@ -21,7 +22,9 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin, UUIDPrimaryKeyMixin, enum_column, fk_column
@@ -39,18 +42,36 @@ class JobSource(StrEnum):
 
 
 class RequirementType(StrEnum):
-    SKILL = "skill"
+    SKILL = "skill"  # a skill statement ("Strong written communication")
+    TECHNOLOGY = "technology"  # one named technology, linked to the skill vocabulary
     EXPERIENCE = "experience"
     EDUCATION = "education"
     CERTIFICATION = "certification"
     LANGUAGE = "language"
+    ELIGIBILITY = "eligibility"  # work authorization, graduation year, location, ...
     RESPONSIBILITY = "responsibility"
     OTHER = "other"
 
 
 class RequirementImportance(StrEnum):
-    REQUIRED = "required"
-    PREFERRED = "preferred"
+    """How the job description itself qualifies a statement. Never inferred."""
+
+    REQUIRED = "required"  # stated as required / must / minimum, or under a requirements heading
+    PREFERRED = "preferred"  # nice to have / a plus / preferred
+    INFORMATIONAL = "informational"  # describes the job (duties, stack) - not a requirement
+
+
+class SalaryPeriod(StrEnum):
+    HOUR = "hour"
+    DAY = "day"
+    WEEK = "week"
+    MONTH = "month"
+    YEAR = "year"
+
+
+class JobInputMethod(StrEnum):
+    PASTED_TEXT = "pasted_text"  # description pasted by the user and analyzed
+    MANUAL_ENTRY = "manual_entry"  # fields entered by the user, no extraction
 
 
 class Job(UUIDPrimaryKeyMixin, TimestampMixin, EmbeddingMixin, Base):
@@ -77,10 +98,13 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, EmbeddingMixin, Base):
     workplace_type: Mapped[WorkplaceType | None] = enum_column(WorkplaceType)
     employment_type: Mapped[EmploymentType | None] = enum_column(EmploymentType)
     seniority: Mapped[str | None] = mapped_column(String(100))
-    description: Mapped[str] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
     salary_min: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     salary_max: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     salary_currency: Mapped[str | None] = mapped_column(String(3))
+    salary_period: Mapped[SalaryPeriod | None] = enum_column(SalaryPeriod)
+    salary_text: Mapped[str | None] = mapped_column(Text)  # verbatim, when explicitly stated
+    application_deadline: Mapped[date | None] = mapped_column(Date)
     posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
@@ -88,6 +112,13 @@ class Job(UUIDPrimaryKeyMixin, TimestampMixin, EmbeddingMixin, Base):
     created_by_user_id: Mapped[uuid.UUID | None] = fk_column(
         "users.id", ondelete="SET NULL", nullable=True
     )
+    # Analysis provenance (user-added jobs).
+    input_method: Mapped[JobInputMethod | None] = enum_column(JobInputMethod)
+    analyzer_name: Mapped[str | None] = mapped_column(String(50))  # "heuristic", "llm:<model>"
+    analysis_warnings: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    analyzed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     requirements: Mapped[list[JobRequirement]] = relationship(
         back_populates="job",
@@ -112,6 +143,8 @@ class JobRequirement(UUIDPrimaryKeyMixin, TimestampMixin, EmbeddingMixin, Base):
     # Normalized link to the skill vocabulary when the requirement is a specific skill.
     skill_id: Mapped[uuid.UUID | None] = fk_column("skills.id", ondelete="SET NULL", nullable=True)
     min_years: Mapped[Decimal | None] = mapped_column(Numeric(4, 1))
+    # The verbatim job-description text this requirement comes from.
+    source_excerpt: Mapped[str | None] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     job: Mapped[Job] = relationship(back_populates="requirements")

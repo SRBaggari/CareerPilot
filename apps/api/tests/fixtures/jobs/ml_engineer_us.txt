@@ -1,0 +1,29 @@
+Senior Machine Learning Engineer at Northwind Robotics
+Location: Austin, TX
+This is a fully remote role.
+Employment type: Full-time
+
+About Northwind Robotics
+Northwind builds perception software for warehouse robots. Our stack includes Kubernetes and Kafka.
+
+What you'll do
+• Design and ship model training pipelines in PyTorch.
+• Collaborate with hardware teams to deploy models to edge devices.
+• Mentor junior engineers.
+
+Requirements
+• 5+ years of professional experience building machine learning systems.
+• Strong proficiency in Python and SQL.
+• Experience deploying models with Docker on AWS.
+• Bachelor's degree in Computer Science or a related field.
+• Must be authorized to work in the United States; we do not sponsor visas.
+
+Nice to have
+• Experience with ONNX or TensorRT.
+• AWS Certified Machine Learning - Specialty certification is a plus.
+• Familiarity with Terraform.
+
+Compensation
+Salary: $160,000 - $200,000 per year, plus equity.
+
+Apply by July 31, 2026.
