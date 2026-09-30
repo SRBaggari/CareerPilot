@@ -97,22 +97,30 @@ database; readiness reports `not configured` in that case.
 
 Readiness requires both a working connection and the `vector` extension.
 
-## 4. AI provider abstraction _(planned)_
+## 4. AI provider abstraction _(implemented for resume parsing)_
 
-Business logic will depend on small interfaces (Python `Protocol`s), not vendor SDKs:
+Business logic depends on small interfaces (Python `Protocol`s), not vendor SDKs.
+`app/ai/provider.py`:
 
 ```python
 class LLMProvider(Protocol):
-    async def generate(self, request: LLMRequest) -> LLMResponse: ...
-
-class EmbeddingProvider(Protocol):
-    dimensions: int
-    async def embed(self, texts: Sequence[str]) -> list[list[float]]: ...
+    name: str
+    model: str
+    async def complete_json(self, *, system: str, prompt: str,
+                            schema: dict[str, Any], max_tokens: int = 16000) -> LLMJsonResult: ...
 ```
 
-Concrete adapters (the first is `AnthropicLLMProvider`) are selected by `LLM_PROVIDER` /
-`EMBEDDING_PROVIDER` at startup and injected via FastAPI dependencies. Adding a provider means
-adding one adapter; no domain code changes. Tests use deterministic fake providers.
+- `AnthropicProvider` is the first adapter. It uses the official `anthropic` SDK with
+  structured outputs and `claude-opus-5-5` (`LLM_MODEL`), and turns every failure (API errors,
+  refusals, truncation, bad JSON) into `LLMError`.
+- `get_llm_provider(settings)` returns `None` when no credentials are configured, so callers
+  fall back to non-AI behaviour.
+- Providers are injected through FastAPI dependencies, and tests substitute deterministic
+  fakes.
+- Adding a provider means adding one adapter; no domain code changes.
+
+_(Planned)_ An `EmbeddingProvider` protocol (`dimensions`, `embed(texts)`) will follow the same
+pattern for matching.
 
 ## 5. Evidence and claim traceability _(schema implemented; generation planned)_
 
@@ -175,6 +183,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 0     | Foundation: monorepo, tooling, DB wiring, health checks (**done**)    |
 | 1a    | Database schema: 27 tables, constraints, pgvector (**done**)          |
 | 1b    | Candidate profile API + dashboard, AI suggestion review (**done**)    |
+| 2     | Resume ingestion: PDF/DOCX, grounded extraction, review (**done**)    |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

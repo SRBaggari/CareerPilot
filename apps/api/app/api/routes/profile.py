@@ -12,6 +12,7 @@ from app.db.session import get_session
 from app.profiles import service, suggestions
 from app.profiles.models import SuggestionStatus
 from app.profiles.schemas import (
+    AcceptSuggestionIn,
     EvidenceIn,
     EvidenceOut,
     EvidenceUpdate,
@@ -183,17 +184,23 @@ async def delete_skill(
 @router.get("/suggestions", response_model=list[SuggestionOut])
 async def list_suggestions(
     status_filter: SuggestionStatus | None = SuggestionStatus.PENDING,
+    resume_id: uuid.UUID | None = None,
     session: AsyncSession = Session,
     user: User = CurrentUser,
 ) -> list[SuggestionOut]:
-    return await suggestions.list_suggestions(session, user, status_filter)
+    return await suggestions.list_suggestions(session, user, status_filter, resume_id)
 
 
 @router.post("/suggestions/{suggestion_id}/accept", response_model=SuggestionOut)
 async def accept_suggestion(
-    suggestion_id: uuid.UUID, session: AsyncSession = Session, user: User = CurrentUser
+    suggestion_id: uuid.UUID,
+    payload: AcceptSuggestionIn | None = None,
+    session: AsyncSession = Session,
+    user: User = CurrentUser,
 ) -> SuggestionOut:
-    return await suggestions.accept_suggestion(session, user, suggestion_id)
+    """Accept as proposed, or send ``{"proposed_data": {...}}`` to accept an edited version."""
+    edited = payload.proposed_data if payload is not None else None
+    return await suggestions.accept_suggestion(session, user, suggestion_id, edited)
 
 
 @router.post("/suggestions/{suggestion_id}/reject", response_model=SuggestionOut)

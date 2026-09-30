@@ -32,12 +32,18 @@ class Settings(BaseSettings):
     # Ignored (and all requests rejected) when app_env is "production".
     dev_user_email: str | None = None
 
-    # AI provider configuration — consumed by provider implementations in later phases.
+    # AI provider configuration.
     llm_provider: str = "anthropic"
-    llm_model: str | None = None
+    llm_model: str = "claude-opus-5-5"
     anthropic_api_key: SecretStr | None = None
     embedding_provider: str | None = None
     embedding_model: str | None = None
+
+    # Resume ingestion.
+    storage_dir: str = "storage"  # local directory for uploaded files (git-ignored)
+    max_resume_bytes: int = Field(default=5 * 1024 * 1024, gt=0)
+    # "auto": use the LLM parser when an API key is configured, else the rule-based parser.
+    resume_parser: Literal["auto", "heuristic", "llm"] = "auto"
 
     @field_validator("cors_origins", mode="before")
     @classmethod

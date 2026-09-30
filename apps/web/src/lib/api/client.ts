@@ -36,7 +36,11 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   try {
     response = await fetch(`${publicConfig.apiBaseUrl}${path}`, {
       ...init,
-      headers: { "Content-Type": "application/json", ...init.headers },
+      // FormData (file uploads) must set its own multipart boundary header.
+      headers:
+        init.body instanceof FormData
+          ? init.headers
+          : { "Content-Type": "application/json", ...init.headers },
     });
   } catch {
     throw new ApiError(0, "Cannot reach the CareerPilot API. Is the backend running?");

@@ -5,8 +5,9 @@ rolled back, so nothing a test writes is persisted.
 
 import asyncio
 import os
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
+from typing import Any
 
 import httpx2
 import pytest
@@ -16,7 +17,8 @@ from sqlalchemy import Connection
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
-from app.core.config import Settings
+from app.api.routes.resumes import get_resume_llm
+from app.core.config import Settings, get_settings
 from app.db.session import get_session
 from app.main import create_app
 from app.users.dependencies import get_current_user
@@ -94,9 +96,20 @@ async def user(db: AsyncSession) -> User:
     return await make_user(db, "candidate@example.test")
 
 
-def client_for(db: AsyncSession, user: User) -> httpx2.AsyncClient:
-    """An HTTP client for the real app, acting as ``user`` inside the test transaction."""
-    app = create_app(Settings(_env_file=None, app_env="test"))
+def client_for(
+    db: AsyncSession,
+    user: User,
+    *,
+    settings: Settings | None = None,
+    overrides: dict[Callable[..., Any], Callable[..., Any]] | None = None,
+) -> httpx2.AsyncClient:
+    """An HTTP client for the real app, acting as ``user`` inside the test transaction.
+
+    Settings never come from the developer's environment, and no real AI provider is used
+    unless a test overrides ``get_resume_llm`` itself.
+    """
+    settings = settings or Settings(_env_file=None, app_env="test")
+    app = create_app(settings)
 
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db
@@ -108,6 +121,9 @@ def client_for(db: AsyncSession, user: User) -> httpx2.AsyncClient:
 
     app.dependency_overrides[get_session] = _session
     app.dependency_overrides[get_current_user] = _user
+    app.dependency_overrides[get_settings] = lambda: settings
+    app.dependency_overrides[get_resume_llm] = lambda: None
+    app.dependency_overrides.update(overrides or {})
     return httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="http://test")
 
 

@@ -448,6 +448,12 @@ class Resume(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     parse_error: Mapped[str | None] = mapped_column(Text)
     parsed_text: Mapped[str | None] = mapped_column(Text)
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    # Which parser produced the suggestions ("heuristic", "llm:<model>"), and non-fatal
+    # problems found while parsing (e.g. an entry that could not be read).
+    parser_name: Mapped[str | None] = mapped_column(String(50))
+    parse_warnings: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
 
     profile: Mapped[CandidateProfile] = relationship(back_populates="resumes")
 
@@ -560,6 +566,13 @@ class ProfileSuggestion(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     applied_target_id: Mapped[uuid.UUID | None] = mapped_column()
+    # Provenance for resume extraction: the upload, and the verbatim text it came from.
+    resume_id: Mapped[uuid.UUID | None] = fk_column(
+        "resumes.id", ondelete="SET NULL", nullable=True
+    )
+    source_excerpt: Mapped[str | None] = mapped_column(Text)
+    # What the candidate actually confirmed (may differ from proposed_data if edited).
+    accepted_data: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     ai_execution_log_id: Mapped[uuid.UUID | None] = fk_column(
         "ai_execution_logs.id", ondelete="SET NULL", nullable=True
     )

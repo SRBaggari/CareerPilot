@@ -114,6 +114,15 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+async def _save(session: AsyncSession, commit: bool) -> None:
+    """Commit, or only flush when the caller is composing a larger transaction
+    (e.g. accepting a suggestion must apply all of its changes or none)."""
+    if commit:
+        await session.commit()
+    else:
+        await session.flush()
+
+
 # --- Loading ---------------------------------------------------------------------------
 
 
@@ -239,7 +248,9 @@ async def create_profile(session: AsyncSession, user: User, payload: ProfileIn) 
     return await read_profile(session, user)
 
 
-async def update_profile(session: AsyncSession, user: User, patch: ProfilePatch) -> ProfileOut:
+async def update_profile(
+    session: AsyncSession, user: User, patch: ProfilePatch, *, commit: bool = True
+) -> ProfileOut:
     profile = await get_profile(session, user)
     changes = patch.model_dump(exclude_unset=True)
     for field, value in changes.items():
@@ -249,7 +260,7 @@ async def update_profile(session: AsyncSession, user: User, patch: ProfilePatch)
     validated = ProfileIn.model_validate(merged)  # whole-object validation
     for field, value in validated.model_dump(mode="json").items():
         setattr(profile, field, value)
-    await session.commit()
+    await _save(session, commit)
     return await read_profile(session, user)
 
 
@@ -301,13 +312,18 @@ async def _item_evidence(
 
 
 async def create_item(
-    session: AsyncSession, user: User, spec: SectionSpec[Any], payload: BaseModel
+    session: AsyncSession,
+    user: User,
+    spec: SectionSpec[Any],
+    payload: BaseModel,
+    *,
+    commit: bool = True,
 ) -> ItemOutMixin:
     profile = await get_profile(session, user)
     await _validate_references(session, profile, payload)
     item = spec.model(candidate_profile_id=profile.id, **payload.model_dump())
     session.add(item)
-    await session.commit()
+    await _save(session, commit)
     await session.refresh(item)
     return item_out(spec, item, [])
 
@@ -318,13 +334,15 @@ async def replace_item(
     spec: SectionSpec[Any],
     item_id: uuid.UUID,
     payload: BaseModel,
+    *,
+    commit: bool = True,
 ) -> ItemOutMixin:
     profile = await get_profile(session, user)
     item = await get_item(session, spec, profile, item_id)
     await _validate_references(session, profile, payload)
     for field, value in payload.model_dump().items():
         setattr(item, field, value)
-    await session.commit()
+    await _save(session, commit)
     await session.refresh(item)
     return item_out(spec, item, await _item_evidence(session, spec, profile, item.id))
 
@@ -372,9 +390,11 @@ async def add_evidence(
     payload: EvidenceIn,
     *,
     origin: EvidenceOrigin = EvidenceOrigin.USER_ENTERED,
+    source_resume_id: uuid.UUID | None = None,
+    commit: bool = True,
 ) -> EvidenceOut:
-    """Add a fact. ``origin`` is only non-default when applying an accepted AI suggestion;
-    in every case the candidate has confirmed the content, so ``confirmed_at`` is set."""
+    """Add a fact. ``origin``/``source_resume_id`` are only set when applying an accepted
+    suggestion; in every case the candidate has confirmed the content (``confirmed_at``)."""
     profile = await get_profile(session, user)
     subject: dict[str, uuid.UUID] = {}
     if payload.source_type != EvidenceSourceType.PROFILE:
@@ -393,16 +413,22 @@ async def add_evidence(
         origin=origin,
         content=payload.content,
         confirmed_at=_now(),
+        source_resume_id=source_resume_id,
         **subject,
     )
     session.add(evidence)
-    await session.commit()
+    await _save(session, commit)
     await session.refresh(evidence)
     return evidence_out(evidence, set())
 
 
 async def update_evidence(
-    session: AsyncSession, user: User, evidence_id: uuid.UUID, content: str
+    session: AsyncSession,
+    user: User,
+    evidence_id: uuid.UUID,
+    content: str,
+    *,
+    commit: bool = True,
 ) -> EvidenceOut:
     profile = await get_profile(session, user)
     evidence = await _get_evidence(session, profile, evidence_id)
@@ -413,7 +439,7 @@ async def update_evidence(
             "document's claims untraceable. Add new evidence instead."
         )
     evidence.content = content
-    await session.commit()
+    await _save(session, commit)
     await session.refresh(evidence)
     return evidence_out(evidence, cited)
 
@@ -434,7 +460,9 @@ def normalize_skill_name(name: str) -> str:
     return " ".join(name.lower().split())
 
 
-async def add_skill(session: AsyncSession, user: User, payload: SkillIn) -> SkillOut:
+async def add_skill(
+    session: AsyncSession, user: User, payload: SkillIn, *, commit: bool = True
+) -> SkillOut:
     profile = await get_profile(session, user)
     normalized = normalize_skill_name(payload.name)
     # The skill vocabulary is shared: reuse an existing entry, never rename it.
@@ -463,7 +491,7 @@ async def add_skill(session: AsyncSession, user: User, payload: SkillIn) -> Skil
         years_experience=payload.years_experience,
     )
     session.add(candidate_skill)
-    await session.commit()
+    await _save(session, commit)
     return skill_out(candidate_skill)
 
 

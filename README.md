@@ -10,9 +10,10 @@ Master profile → Job discovery → JD analysis → Semantic matching → Skill
   → HUMAN APPROVAL → Browser-assisted application (stops before submit) → Tracking
 ```
 
-> **Status: Candidate profile.** Full relational schema plus the master-profile API and
-> dashboard (`/profile`). No job discovery or AI generation yet. See
-> [docs/profile.md](docs/profile.md) and [docs/database.md](docs/database.md).
+> **Status: Resume ingestion.** Master profile API and dashboard (`/profile`), plus resume
+> upload (PDF/DOCX) with extraction you review before anything is saved. No job discovery
+> or matching yet. See [docs/resume-ingestion.md](docs/resume-ingestion.md),
+> [docs/profile.md](docs/profile.md), and [docs/database.md](docs/database.md).
 
 ## Non-negotiable principles
 
@@ -64,6 +65,9 @@ npm run dev:web                # http://localhost:3000
 
 Open http://localhost:3000/profile to build your master profile. Until authentication is
 added, the API acts as the local user set by `DEV_USER_EMAIL` in `apps/api/.env`.
+
+Resume parsing works offline with a rule-based parser. To use Claude for extraction, set
+`ANTHROPIC_API_KEY` in `apps/api/.env` (`RESUME_PARSER=auto` picks it up).
 
 Check the backend: `GET http://localhost:8000/health` (liveness) and
 `GET http://localhost:8000/health/ready` (database + pgvector readiness).

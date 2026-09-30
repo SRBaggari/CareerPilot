@@ -1,0 +1,47 @@
+PRIYA SHARMA
+Hyderabad, India | priya.sharma@example.test | +91 98765 43210
+linkedin.com/in/priya-sharma-dev | github.com/priya-dev
+
+SUMMARY
+Final-year computer science student focused on machine learning systems.
+
+EDUCATION
+State Institute of Technology, Hyderabad    2020 - 2024
+B.Tech in Computer Science and Engineering
+CGPA: 8.7/10
+City Junior College    2018 - 2020
+Intermediate (MPC), 94.2%
+
+EXPERIENCE
+Machine Learning Intern | Acme Analytics Pvt Ltd    May 2023 - Aug 2023
+• Built a document classification service that reduced manual tagging by 40%.
+• Deployed the model with FastAPI and Docker on AWS ECS.
+Teaching Assistant, State Institute of Technology    Jan 2023 - Present
+• Mentored 60 students in data structures lab sessions.
+
+PROJECTS
+Multi-Agent Research Assistant | Python, LangChain | github.com/priya-dev/mara
+• Implemented RAG pipeline using document retrieval and question answering.
+• Evaluated answer faithfulness on 200 questions with an
+automated grading script.
+Expense Tracker App    2022
+• Built a React Native app with offline sync.
+
+TECHNICAL SKILLS
+Languages: Python, Java, C++, SQL
+Frameworks: PyTorch, FastAPI, React (Hooks, Redux)
+Tools: Git, Docker, AWS
+
+CERTIFICATIONS
+AWS Certified Cloud Practitioner - Amazon Web Services (2023)
+• Deep Learning Specialization by Coursera, 2022
+
+ACHIEVEMENTS
+• Winner, Smart India Hackathon 2023
+• Ranked in top 2% of JEE Main 2020 among 1.1 million candidates
+
+RELEVANT COURSEWORK
+Data Structures, Operating Systems, Machine Learning, Database Management Systems
+
+LANGUAGES
+English, Hindi, Telugu

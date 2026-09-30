@@ -10,12 +10,13 @@ import { emptyValues } from "@/lib/profile/form";
 import { SECTIONS } from "@/lib/profile/sections";
 
 import { EvidenceList } from "./EvidenceList";
+import { ExtractedInfoReview } from "./ExtractedInfoReview";
 import { ItemForm } from "./ItemForm";
 import { PERSONAL_FIELDS, PersonalInfoCard } from "./PersonalInfoCard";
 import { PreferencesCard } from "./PreferencesCard";
+import { ResumeCard } from "./ResumeCard";
 import { SectionCard } from "./SectionCard";
 import { SkillsCard } from "./SkillsCard";
-import { SuggestionsCard } from "./SuggestionsCard";
 
 type State =
   | { status: "loading" }
@@ -24,6 +25,7 @@ type State =
   | { status: "ready"; profile: Profile };
 
 const NAV = [
+  { href: "#resume", label: "Resume" },
   { href: "#personal", label: "Personal" },
   { href: "#preferences", label: "Preferences" },
   { href: "#skills", label: "Skills" },
@@ -143,7 +145,8 @@ export function ProfileDashboard() {
                 </p>
               </div>
 
-              <SuggestionsCard count={state.profile.pending_suggestions} onChanged={reload} />
+              <ResumeCard onChanged={reload} />
+              <ExtractedInfoReview count={state.profile.pending_suggestions} onChanged={reload} />
               <PersonalInfoCard profile={state.profile} onChanged={reload} />
               <PreferencesCard
                 key={state.profile.updated_at}

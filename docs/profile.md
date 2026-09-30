@@ -55,7 +55,9 @@ highlights are cited is also refused.
 | `POST` | `/api/v1/profile/skills` | Adds from the shared skill vocabulary (case- and whitespace-insensitive, 409 on duplicate) |
 | `PUT` / `DELETE` | `/api/v1/profile/skills/{id}` | Proficiency and years only; the shared skill name is never changed |
 | `GET` | `/api/v1/profile/suggestions?status_filter=pending` | Review queue |
-| `POST` | `/api/v1/profile/suggestions/{id}/accept` or `/reject` | 409 if already decided |
+| `POST` | `/api/v1/profile/suggestions/{id}/accept` | Optional body `{"proposed_data": {...}}` accepts an **edited** version (validated like a manual edit). 409 if already decided |
+| `POST` | `/api/v1/profile/suggestions/{id}/reject` | 409 if already decided |
+| `POST` / `GET` / `DELETE` | `/api/v1/resumes[/{id}]` | Resume upload and management; see [resume-ingestion.md](resume-ingestion.md) |
 
 Errors: 404 (not found or not yours), 409 (conflict), 422 (validation, FastAPI's standard
 `detail[].loc/msg` shape, field-level where possible).

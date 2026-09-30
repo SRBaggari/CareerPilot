@@ -1,7 +1,7 @@
 # CareerPilot Database Schema
 
 PostgreSQL 16+ with the `pgvector` extension. Models live in `apps/api/app/<domain>/models.py`;
-migrations in `apps/api/migrations/versions/`. This document describes revision `0003`.
+migrations in `apps/api/migrations/versions/`. This document describes revision `0004`.
 
 ## 1. Core principle: evidence is the source of truth
 
@@ -196,6 +196,14 @@ apart from the user-provided profile: `section`, `action` (create/update), `targ
 `source`, `rationale`, and `status` (pending → accepted/rejected, with `reviewed_at` set exactly
 when decided). `applied_target_id` records the row created or updated on acceptance.
 `target_id` / `applied_target_id` have no FK because the target table varies by `section`.
+Resume-extracted suggestions also record `resume_id` (FK, `SET NULL`), the verbatim
+`source_excerpt`, and on acceptance `accepted_data`, which is what the candidate confirmed
+and may differ from `proposed_data` if they edited it. Item proposals may carry a
+`highlights` list; each highlight becomes an evidence row on acceptance. See
+[resume-ingestion.md](resume-ingestion.md).
+
+`resumes` records `parser_name` (`heuristic` or `llm:<model>`) and `parse_warnings` (JSONB
+list), in addition to `parse_status`, `parse_error`, and the extracted `parsed_text`.
 
 ### AI audit log
 

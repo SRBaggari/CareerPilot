@@ -83,6 +83,9 @@ export type Suggestion = {
   source: "resume_extraction" | "ai_generation";
   rationale: string | null;
   status: "pending" | "accepted" | "rejected";
+  resume_id: string | null;
+  source_excerpt: string | null;
+  accepted_data: Record<string, unknown> | null;
   created_at: string;
 };
 
@@ -143,8 +146,12 @@ export const deleteSkill = (id: string) =>
 
 export const listSuggestions = () => apiFetch<Suggestion[]>(`${BASE}/suggestions`);
 
-export const acceptSuggestion = (id: string) =>
-  apiFetch<Suggestion>(`${BASE}/suggestions/${id}/accept`, { method: "POST" });
+/** Accept as proposed, or pass the user's edited version of the proposed data. */
+export const acceptSuggestion = (id: string, editedData?: Record<string, unknown>) =>
+  apiFetch<Suggestion>(`${BASE}/suggestions/${id}/accept`, {
+    method: "POST",
+    body: editedData ? jsonBody({ proposed_data: editedData }) : undefined,
+  });
 
 export const rejectSuggestion = (id: string) =>
   apiFetch<Suggestion>(`${BASE}/suggestions/${id}/reject`, { method: "POST" });

@@ -403,4 +403,13 @@ class SuggestionOut(BaseModel):
     status: SuggestionStatus
     reviewed_at: datetime | None
     applied_target_id: uuid.UUID | None
+    resume_id: uuid.UUID | None
+    source_excerpt: str | None  # verbatim source text, for the reviewer
+    accepted_data: dict[str, Any] | None  # what the candidate confirmed (may be edited)
     created_at: datetime
+
+
+class AcceptSuggestionIn(InputModel):
+    """Optional body for accept: the candidate's edited version of ``proposed_data``."""
+
+    proposed_data: dict[str, Any] | None = None
