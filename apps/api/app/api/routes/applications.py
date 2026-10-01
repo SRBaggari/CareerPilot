@@ -11,8 +11,10 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.applications import service
+from app.applications import review, service
+from app.applications.approval import ReviewPackage
 from app.applications.models import ApplicationStatus
+from app.applications.review import ApprovalIn, RejectionIn
 from app.applications.schemas import (
     ApplicationCreate,
     ApplicationOut,
@@ -96,13 +98,40 @@ async def change_status(
     return await service.change_status(session, user, application_id, payload)
 
 
-@router.post("/{application_id}/approve", response_model=ApplicationOut)
-async def approve_application(
+@router.get("/{application_id}/review", response_model=ReviewPackage)
+async def get_review(
     application_id: uuid.UUID, session: Session, user: CurrentUser
-) -> ApplicationOut:
-    """Your explicit approval, after a readiness check (verified resume and cover letter,
-    approved answers). It submits nothing; it lets you record the submission."""
-    return await service.approve(session, user, application_id)
+) -> ReviewPackage:
+    """Everything to check before submitting: job, company, resume, cover letter, answers,
+    personal information, verification results, and missing or uncertain fields. Opening
+    it is recorded and never approves anything."""
+    return await review.get_review(session, user, application_id)
+
+
+@router.post("/{application_id}/review/request", response_model=ReviewPackage)
+async def request_review(
+    application_id: uuid.UUID, session: Session, user: CurrentUser
+) -> ReviewPackage:
+    """Mark the application ready for your review (from draft or rejected)."""
+    return await review.request_review(session, user, application_id)
+
+
+@router.post("/{application_id}/approve", response_model=ReviewPackage)
+async def approve_application(
+    application_id: uuid.UUID, payload: ApprovalIn, session: Session, user: CurrentUser
+) -> ReviewPackage:
+    """Your explicit approval of the exact content you reviewed (``content_hash`` from the
+    review, ``confirm: true``). Refused if anything is missing or unverified. It submits
+    nothing."""
+    return await review.approve(session, user, application_id, payload)
+
+
+@router.post("/{application_id}/reject", response_model=ReviewPackage)
+async def reject_application(
+    application_id: uuid.UUID, payload: RejectionIn, session: Session, user: CurrentUser
+) -> ReviewPackage:
+    """Reject the application, or withdraw your approval."""
+    return await review.reject(session, user, application_id, payload)
 
 
 @router.post("/{application_id}/interviews", response_model=ApplicationOut)

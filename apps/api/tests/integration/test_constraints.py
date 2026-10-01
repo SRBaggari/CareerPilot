@@ -12,7 +12,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.applications.models import APPROVAL_REQUIRED_STATUSES, Application, ApplicationStatus
+from app.applications.models import (
+    APPROVAL_REQUIRED_STATUSES,
+    Application,
+    ApplicationStatus,
+    ApprovalState,
+)
 from app.db.vector import EMBEDDING_DIMENSIONS
 from app.documents.models import (
     ClaimVerification,
@@ -228,6 +233,7 @@ async def test_approved_then_submitted_application_is_valid(db: AsyncSession) ->
             job_id=g.job.id,
             tailored_resume_id=g.resume.id,
             status=ApplicationStatus.SUBMITTED,
+            approval_state=ApprovalState.SUBMITTED,
             approved_at=now,
             submitted_at=now + timedelta(minutes=5),
         )

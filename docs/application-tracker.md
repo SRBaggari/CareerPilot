@@ -32,23 +32,22 @@ REJECTED / WITHDRAWN at any point
 A refused move returns 409 with the reason, e.g. "Approve the application first: nothing
 counts as submitted without your approval".
 
-### Approval (`POST /applications/{id}/approve`)
+### Approval
 
-Approval is your sign-off. A readiness check runs first, and every blocker is listed:
+Approval is explicit and bound to the exact content you reviewed; see
+[human-approval.md](human-approval.md). In short: mark the application ready for review,
+open the review (job, company, resume, cover letter, answers, personal information,
+verification results, missing or uncertain fields), then approve that version with
+`{content_hash, confirm: true}`. Approving:
 
-- the application is at "Application prepared" or "Awaiting approval";
-- a tailored resume is attached and is verified;
-- the cover letter, if one is attached, is verified;
-- every application answer with text is approved.
-
-Approving:
-- sets `approved_at`;
+- records you as the reviewer, the time, and the approved content version;
 - moves the application to "Awaiting approval";
 - marks the attached resume and cover letter **approved**, so they're locked from further
   edits and kept when you regenerate.
 
-You then submit the application yourself and record it: "Submitted", with the date you
-applied.
+You then submit the application yourself and record it ("Submitted", with the date you
+applied), or let browser assistance submit it. Either way, submission is refused if the
+content changed after approval or anything is missing or unverified.
 
 ## What is tracked
 
@@ -119,7 +118,8 @@ application.
 | POST | `/applications` | Track a job: 201 when new, 200 when it already exists |
 | GET, PATCH, DELETE | `/applications/{id}` | Detail; edit notes, URL and attached documents; delete |
 | POST | `/applications/{id}/status` | Move it; `submitted_on` is the date you applied |
-| POST | `/applications/{id}/approve` | Your approval, after the readiness check |
+| GET | `/applications/{id}/review` | Everything to review before submitting (never approves) |
+| POST | `/applications/{id}/review/request`, `/approve`, `/reject` | Approval decisions ([human-approval.md](human-approval.md)) |
 | POST, PATCH, DELETE | `/applications/{id}/interviews[/{interview_id}]` | Interviews |
 | POST, PATCH, DELETE | `/applications/{id}/follow-ups[/{follow_up_id}]` | Follow-ups |
 

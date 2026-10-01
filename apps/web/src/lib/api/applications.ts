@@ -1,4 +1,5 @@
 import { apiFetch, jsonBody } from "./client";
+import type { ApprovalState } from "./review";
 
 export type ApplicationStatus =
   | "discovered"
@@ -84,6 +85,7 @@ export type ApplicationSummary = {
   discovered_at: string | null;
   applied_at: string | null;
   approved_at: string | null;
+  approval_state: ApprovalState;
   updated_at: string;
   next_interview_at: string | null;
   next_follow_up_at: string | null;
@@ -167,8 +169,6 @@ export const changeStatus = (
     method: "POST",
     body: jsonBody({ status, ...extra }),
   });
-export const approveApplication = (id: string) =>
-  apiFetch<Application>(`${ROOT}/${id}/approve`, { method: "POST" });
 export const addInterview = (id: string, body: Record<string, unknown>) =>
   apiFetch<Application>(`${ROOT}/${id}/interviews`, { method: "POST", body: jsonBody(body) });
 export const updateInterview = (id: string, interviewId: string, body: Record<string, unknown>) =>

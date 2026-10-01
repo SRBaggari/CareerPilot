@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from app.applications.models import (
     PRE_SUBMISSION,
     ApplicationStatus,
+    ApprovalState,
     FollowUpChannel,
     FollowUpStatus,
     InterviewStatus,
@@ -164,6 +165,7 @@ class ApplicationSummaryOut(BaseModel):
     discovered_at: datetime | None
     applied_at: datetime | None  # when you submitted it
     approved_at: datetime | None
+    approval_state: ApprovalState
     updated_at: datetime
     next_interview_at: datetime | None
     next_follow_up_at: datetime | None

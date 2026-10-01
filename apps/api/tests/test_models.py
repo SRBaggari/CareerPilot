@@ -9,6 +9,8 @@ from app.db.models import Base
 
 APPEND_ONLY_TABLES = {
     "application_status_history",
+    "application_approvals",
+    "application_audit_events",
     "claim_verifications",
     "ai_execution_logs",
     "generated_claim_evidence",
@@ -26,7 +28,7 @@ def test_all_expected_tables_are_registered() -> None:
     # 25 core tables + profile_suggestions + requirement_matches + verification_reports
     # + application_answers + job_recommendations + application_runs
     # + automation_audit_events + association tables
-    assert len(Base.metadata.tables) == 32 + len(ASSOCIATION_TABLES)
+    assert len(Base.metadata.tables) == 34 + len(ASSOCIATION_TABLES)
 
 
 def test_timestamps() -> None:

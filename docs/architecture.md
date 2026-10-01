@@ -157,6 +157,11 @@ to that evidence verbatim; everything else unsupported is rejected and audited. 
   Only a user action can move an application to `approved` or `submitted`. The database
   already rejects any post-approval status without `approved_at`, and any `submitted_at`
   earlier than `approved_at` (see database.md, section "Applications").
+- Every application has an approval state (draft → ready for review → approved →
+  submitted, or rejected). Approval is an explicit action bound to the SHA-256 of the
+  reviewed content and records the reviewer; opening the review never approves. Every
+  submission path goes through one gate that refuses unapproved, changed, incomplete or
+  unverified applications. See [human-approval.md](human-approval.md).
 - Playwright automation fills forms for an **approved** application on a **supported** site
   and then **pauses before the final submit** on an Application Review screen. Submission
   requires the user's explicit confirmation of that exact review (its SHA-256); the browser
@@ -215,6 +220,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 6b    | Recommendations: discovery → analysis → evidence → matching → eligibility, explained (**done**) |
 | 6c    | Application tracker: lifecycle with approval gate, board, timeline, reminders (**done**) |
 | 7     | Browser-assisted applications: mock site, fill, review, confirm, audit (**done**) |
+| 7b    | Human-in-the-loop approval: states, review package, content-bound approval, submission gate (**done**) |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

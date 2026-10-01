@@ -7,7 +7,6 @@ import { Badge, Button, Card, EmptyState, Field, inputClass } from "@/components
 import {
   addFollowUp,
   addInterview,
-  approveApplication,
   changeStatus,
   formatDate,
   formatDateTime,
@@ -21,6 +20,7 @@ import {
   type InterviewType,
 } from "@/lib/api/applications";
 import { ApiError } from "@/lib/api/client";
+import { APPROVAL_LABELS } from "@/lib/api/review";
 
 const INTERVIEW_TYPES: InterviewType[] = [
   "phone_screen",
@@ -255,8 +255,12 @@ export function ApplicationDetailPage({ applicationId }: { applicationId: string
 
           <Card
             title="Approval"
-            description="Your explicit sign-off. It submits nothing: after approving, submit the application yourself and record it as submitted, or let CareerPilot fill it in on a supported site and submit only after you confirm the final review."
+            description="Your explicit sign-off on one exact version, after reviewing everything that will be submitted. Opening the review doesn't approve anything, and any change after approval withdraws it."
           >
+            <p className="mb-3 text-sm">
+              <span className="text-zinc-500">Approval:</span>{" "}
+              <strong aria-label="Approval state">{APPROVAL_LABELS[app.approval_state]}</strong>
+            </p>
             <ul className="space-y-1 text-sm" aria-label="Readiness">
               {app.readiness.map((item) => (
                 <li key={item.label}>
@@ -267,43 +271,40 @@ export function ApplicationDetailPage({ applicationId }: { applicationId: string
                 </li>
               ))}
             </ul>
-            {approvedAlready ? (
-              <div className="mt-3 space-y-2">
-                <p className="text-sm text-emerald-800" role="status">
+            {!approvedAlready && !canApprove ? (
+              <ul
+                className="mt-3 list-disc pl-5 text-sm text-amber-800"
+                aria-label="Approval blockers"
+              >
+                {app.approval_blockers.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="mt-3 space-y-2 text-sm">
+              {approvedAlready ? (
+                <p className="text-emerald-800" role="status">
                   Approved by you on {formatDateTime(app.approved_at)}.
                 </p>
-                {!app.applied_at ? (
-                  <p className="text-sm">
-                    <Link href={`/applications/${app.id}/assist`} className="font-medium underline">
-                      Fill it in on the site for my review
-                    </Link>{" "}
-                    <span className="text-zinc-500">
-                      (supported sites only; nothing is submitted until you confirm)
-                    </span>
-                  </p>
-                ) : null}
-              </div>
-            ) : (
-              <div className="mt-3 space-y-2">
-                {!canApprove ? (
-                  <ul
-                    className="list-disc pl-5 text-sm text-amber-800"
-                    aria-label="Approval blockers"
-                  >
-                    {app.approval_blockers.map((b) => (
-                      <li key={b}>{b}</li>
-                    ))}
-                  </ul>
-                ) : null}
-                <Button
-                  variant="primary"
-                  disabled={busy || !canApprove}
-                  onClick={() => void run(() => approveApplication(app.id))}
-                >
-                  Approve application
-                </Button>
-              </div>
-            )}
+              ) : null}
+              <p>
+                <Link href={`/applications/${app.id}/review`} className="font-medium underline">
+                  {approvedAlready || app.applied_at
+                    ? "Open the review"
+                    : "Review everything and approve"}
+                </Link>
+              </p>
+              {approvedAlready && !app.applied_at ? (
+                <p>
+                  <Link href={`/applications/${app.id}/assist`} className="font-medium underline">
+                    Fill it in on the site for my review
+                  </Link>{" "}
+                  <span className="text-zinc-500">
+                    (supported sites only; nothing is submitted until you confirm)
+                  </span>
+                </p>
+              ) : null}
+            </div>
           </Card>
 
           <Card title="Documents and answers">

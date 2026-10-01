@@ -26,6 +26,7 @@ function summary(overrides: Partial<ApplicationSummary> = {}): ApplicationSummar
     discovered_at: "2026-09-20T10:00:00Z",
     applied_at: null,
     approved_at: null,
+    approval_state: "draft",
     updated_at: "2026-09-30T10:00:00Z",
     next_interview_at: null,
     next_follow_up_at: null,
@@ -277,13 +278,13 @@ describe("ApplicationDetailPage", () => {
     expect(screen.getByText(/Interviews can be added once/)).toBeVisible();
   });
 
-  it("approves, then records the submission with the date applied", async () => {
+  it("links approved applications to the review, then records the submission", async () => {
     const calls = stubApi({
-      "GET /applications/a1": () => ({ status: 200, body: detail() }),
-      "POST /applications/a1/approve": () => ({
+      "GET /applications/a1": () => ({
         status: 200,
         body: detail({
           status: "awaiting_approval",
+          approval_state: "approved",
           approved_at: "2026-09-30T10:00:00Z",
           approval_blockers: ["Already approved."],
           allowed_statuses: ["saved", "application_prepared", "submitted", "withdrawn"],
@@ -300,8 +301,13 @@ describe("ApplicationDetailPage", () => {
       }),
     });
     render(<ApplicationDetailPage applicationId="a1" />);
-    fireEvent.click(await screen.findByRole("button", { name: "Approve application" }));
     expect(await screen.findByText(/Approved by you on/)).toBeVisible();
+    expect(screen.getByLabelText("Approval state")).toHaveTextContent("Approved");
+    expect(screen.getByRole("link", { name: "Open the review" })).toHaveAttribute(
+      "href",
+      "/applications/a1/review",
+    );
+    expect(screen.queryByRole("button", { name: "Approve application" })).toBeNull();
     fireEvent.change(screen.getByLabelText("Move to"), { target: { value: "submitted" } });
     fireEvent.change(screen.getByLabelText("Date you applied"), {
       target: { value: "2026-09-30" },
@@ -325,7 +331,9 @@ describe("ApplicationDetailPage", () => {
     });
     render(<ApplicationDetailPage applicationId="a1" />);
     expect(await screen.findByLabelText("Approval blockers")).toHaveTextContent("0 of 1 approved");
-    expect(screen.getByRole("button", { name: "Approve application" })).toBeDisabled();
+    // Approval only happens on the review page, never with a single click here.
+    expect(screen.queryByRole("button", { name: "Approve application" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Review everything and approve" })).toBeVisible();
   });
 
   it("adds interviews and follow-ups, and saves notes", async () => {

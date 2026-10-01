@@ -2,7 +2,14 @@
 (used by Alembic autogenerate and by mapper configuration)."""
 
 from app.ai.models import AIExecutionLog
-from app.applications.models import Application, ApplicationStatusHistory, FollowUp, Interview
+from app.applications.models import (
+    Application,
+    ApplicationApproval,
+    ApplicationAuditEvent,
+    ApplicationStatusHistory,
+    FollowUp,
+    Interview,
+)
 from app.automation.models import ApplicationRun, AutomationAuditEvent
 from app.db.base import Base
 from app.documents.models import (
@@ -38,6 +45,8 @@ __all__ = [
     "Achievement",
     "Application",
     "ApplicationAnswer",
+    "ApplicationApproval",
+    "ApplicationAuditEvent",
     "ApplicationRun",
     "ApplicationStatusHistory",
     "AutomationAuditEvent",

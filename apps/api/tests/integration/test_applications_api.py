@@ -79,6 +79,18 @@ async def ok(response: httpx2.Response) -> dict[str, Any]:
     return response.json()  # type: ignore[no-any-return]
 
 
+async def approve(api: httpx2.AsyncClient, app_id: str) -> httpx2.Response:
+    """The explicit approval: mark it ready for review, open the review, approve exactly the
+    content shown."""
+    state = (await api.get(f"{APPS}/{app_id}")).json()["approval_state"]
+    if state in ("draft", "rejected"):
+        await api.post(f"{APPS}/{app_id}/review/request")
+    review = (await api.get(f"{APPS}/{app_id}/review")).json()
+    return await api.post(
+        f"{APPS}/{app_id}/approve", json={"content_hash": review["content_hash"], "confirm": True}
+    )
+
+
 async def prepared(api: httpx2.AsyncClient) -> tuple[dict[str, Any], dict[str, Any]]:
     """A tracked job with a verified tailored resume, moved to 'application prepared'."""
     ids = await build_profile(api)
@@ -116,15 +128,17 @@ async def test_the_full_lifecycle_with_approval_and_reminders(api: httpx2.AsyncC
 
     # Submission is impossible without the candidate's approval.
     refused = await move(api, app_id, "submitted")
-    assert refused.status_code == 409 and "Approve the application first" in refused.text
+    assert refused.status_code == 409 and "haven't approved" in refused.text
     assert (await move(api, app_id, "interview")).status_code == 409
 
-    approved = await ok(await api.post(f"{APPS}/{app_id}/approve"))
+    package = await ok(await approve(api, app_id))
+    assert package["approval_state"] == "approved" and package["approval"]["version"] == 1
+    approved = await ok(await api.get(f"{APPS}/{app_id}"))
     assert approved["approved_at"] and approved["status"] == "awaiting_approval"
     assert approved["resume"]["status"] == "approved"  # the documents are locked in
     assert approved["timeline"][0]["title"] in ("Approved by you", "Moved to Awaiting approval")
     assert "submitted" in approved["allowed_statuses"]
-    assert (await api.post(f"{APPS}/{app_id}/approve")).status_code == 409  # already approved
+    assert (await approve(api, app_id)).status_code == 409  # already approved
 
     applied_on = datetime.now(UTC).date().isoformat()
     submitted = await ok(
@@ -188,10 +202,10 @@ async def test_approval_needs_verified_documents_and_approved_answers(
     await build_profile(api)
     job_id = await build_job(api)
     app = await track(api, job_id)
-    early = await api.post(f"{APPS}/{app['id']}/approve")
+    early = await api.post(f"{APPS}/{app['id']}/review/request")
     assert early.status_code == 409 and "Application prepared" in early.text
     await move(api, app["id"], "application_prepared")
-    missing = await api.post(f"{APPS}/{app['id']}/approve")
+    missing = await approve(api, app["id"])
     assert missing.status_code == 409 and "Attach a tailored resume" in missing.text
 
     resume = await post(api, f"{JOBS}/{job_id}/tailored-resumes")
@@ -201,14 +215,15 @@ async def test_approval_needs_verified_documents_and_approved_answers(
         f"{JOBS}/{job_id}/application-answers",
         {"questions": ["Describe your experience with Python."]},
     )
-    blocked = await api.post(f"{APPS}/{app['id']}/approve")
-    assert blocked.status_code == 409 and "0 of 1 approved" in blocked.text
+    blocked = await approve(api, app["id"])
+    assert blocked.status_code == 409 and "Approve your answer to" in blocked.text
 
     detail = (await api.get(f"{APPS}/{app['id']}")).json()
     [answer] = detail["answers"]
     assert detail["answers_total"] == 1 and not answer["approved"]
     await post(api, f"/api/v1/application-answers/{answer['id']}/approve")
-    approved = await ok(await api.post(f"{APPS}/{app['id']}/approve"))
+    await ok(await approve(api, app["id"]))
+    approved = await ok(await api.get(f"{APPS}/{app['id']}"))
     assert approved["approval_blockers"] == ["Already approved."]
     assert all(item["ok"] for item in approved["readiness"])
 
@@ -223,7 +238,7 @@ async def test_interviews_need_a_submission_first(api: httpx2.AsyncClient) -> No
 
 async def test_submission_date_cannot_precede_approval(api: httpx2.AsyncClient) -> None:
     app, _ = await prepared(api)
-    await ok(await api.post(f"{APPS}/{app['id']}/approve"))
+    await ok(await approve(api, app["id"]))
     response = await move(api, app["id"], "submitted", submitted_on="2020-01-01")
     assert response.status_code == 422 and "before you approved" in response.text
 
@@ -252,7 +267,7 @@ async def test_documents_used_are_kept_and_protected(api: httpx2.AsyncClient) ->
         await api.patch(f"{APPS}/{app['id']}", json={"tailored_resume_id": second["id"]})
     )
     assert switched["resume"]["id"] == second["id"] and switched["resume"]["newer_version"] is None
-    await ok(await api.post(f"{APPS}/{app['id']}/approve"))
+    await ok(await approve(api, app["id"]))
     locked = await api.patch(f"{APPS}/{app['id']}", json={"tailored_resume_id": None})
     assert locked.status_code == 409
 
@@ -366,7 +381,10 @@ async def test_applications_are_private(
             ("GET", f"{APPS}/{app['id']}", None),
             ("PATCH", f"{APPS}/{app['id']}", {"notes": "x"}),
             ("POST", f"{APPS}/{app['id']}/status", {"status": "saved"}),
-            ("POST", f"{APPS}/{app['id']}/approve", None),
+            ("GET", f"{APPS}/{app['id']}/review", None),
+            ("POST", f"{APPS}/{app['id']}/review/request", None),
+            ("POST", f"{APPS}/{app['id']}/approve", {"content_hash": "0" * 64, "confirm": True}),
+            ("POST", f"{APPS}/{app['id']}/reject", {}),
             (
                 "POST",
                 f"{APPS}/{app['id']}/follow-ups",

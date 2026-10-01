@@ -19,7 +19,7 @@ from app.core.config import Settings
 from app.users.models import User
 
 from .conftest import client_for, make_user
-from .test_applications_api import APPS, move, ok, track
+from .test_applications_api import APPS, approve, move, ok, track
 from .test_evidence_search import SpyEmbedder
 from .test_matching_api import JOBS, build_job, post
 from .test_tailored_resume_api import build_profile
@@ -95,7 +95,8 @@ async def approved_application(
         for answer in answers if isinstance(answers, list) else answers["answers"]:
             await post(api, f"/api/v1/application-answers/{answer['id']}/approve")
     await ok(await move(api, app["id"], "application_prepared"))
-    return await ok(await api.post(f"{APPS}/{app['id']}/approve"))
+    await ok(await approve(api, app["id"]))
+    return await ok(await api.get(f"{APPS}/{app['id']}"))
 
 
 async def start(api: httpx2.AsyncClient, app_id: str, **inputs: str) -> dict[str, Any]:
@@ -338,3 +339,21 @@ async def test_runs_are_private(api: httpx2.AsyncClient, db: AsyncSession, site:
         assert (await other.get(f"{RUNS}/{run['id']}")).status_code == 404
         assert (await other.post(f"{RUNS}/{run['id']}/cancel")).status_code == 404
         assert (await other.get(f"{APPS}/{app['id']}/assisted-runs")).status_code == 404
+
+
+async def test_a_change_after_approval_stops_assisted_submission(
+    api: httpx2.AsyncClient, site: str
+) -> None:
+    app = await approved_application(api, f"{site}/jobs/northwind-ml/apply", letter=False)
+    run = await start(api, app["id"], work_authorization="Yes")
+    assert run["status"] == "awaiting_review", run["stop_reason"]
+    await ok(await api.patch("/api/v1/profile", json={"location": "Bengaluru"}))
+    refused = await api.post(
+        f"{RUNS}/{run['id']}/submit", json={"review_hash": run["review_hash"], "confirm": True}
+    )
+    assert refused.status_code == 409 and "changed after you approved it" in refused.text
+    assert mock_site.SUBMISSIONS == []
+    tracked = await ok(await api.get(f"{APPS}/{app['id']}"))
+    assert tracked["approval_state"] == "ready_for_review" and tracked["applied_at"] is None
+    again = await api.post(f"{APPS}/{app['id']}/assisted-runs", json={"inputs": {}})
+    assert again.status_code == 409 and "Approve the application first" in again.text

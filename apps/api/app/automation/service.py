@@ -19,8 +19,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.applications import approval
 from app.applications import service as applications
-from app.applications.models import Application, ApplicationStatus, FollowUpStatus, StatusActor
+from app.applications.models import (
+    Application,
+    ApplicationStatus,
+    ApprovalState,
+    FollowUpStatus,
+    StatusActor,
+)
 from app.automation import runner
 from app.automation.adapters.base import adapter_for, host_of
 from app.automation.models import ApplicationRun, AuditActor, AutomationAuditEvent, RunStatus
@@ -82,10 +89,22 @@ async def _owned_run(session: AsyncSession, user: User, run_id: uuid.UUID) -> Ap
     return run
 
 
-def _check_application(a: Application) -> None:
+async def _check_application(session: AsyncSession, user: User, a: Application) -> None:
+    """Only applications approved by the candidate, unchanged since approval, are filled."""
     if a.submitted_at is not None:
         raise ConflictError("This application is already marked as submitted.")
-    if a.approved_at is None or a.status != ApplicationStatus.AWAITING_APPROVAL:
+    if a.approval_state == ApprovalState.APPROVED:
+        _, snapshot = await approval.build(session, user, a)
+        if await approval.invalidate_if_changed(session, user, a, snapshot):
+            await session.commit()
+            raise ConflictError(
+                "The application changed after you approved it. Review and approve it again "
+                "before CareerPilot fills it."
+            )
+    if (
+        a.approval_state != ApprovalState.APPROVED
+        or a.status != ApplicationStatus.AWAITING_APPROVAL
+    ):
         raise ConflictError(
             "Approve the application first: CareerPilot only fills applications you approved."
         )
@@ -268,7 +287,7 @@ async def start(
     settings: Settings,
 ) -> RunOut:
     a = await applications._owned(session, user, application_id)
-    _check_application(a)
+    await _check_application(session, user, a)
     url = a.application_url or a.job.url
     if not url:
         raise ConflictError("Add the application page's URL to the application first.")
@@ -311,7 +330,7 @@ async def provide_inputs(
     if run.status not in OPEN:
         raise ConflictError("This assisted application is no longer open; start a new one.")
     a = await applications._owned(session, user, run.application_id)
-    _check_application(a)
+    await _check_application(session, user, a)
     run.inputs = {**run.inputs, **_clean(inputs)}
     _event(
         run,
@@ -348,7 +367,9 @@ async def submit(
             "The review changed since you looked at it. Review it again before submitting."
         )
     a = await applications._owned(session, user, run.application_id)
-    _check_application(a)
+    await _check_application(session, user, a)
+    # Approved, unchanged since approval, nothing missing or unverified (409, audited).
+    await approval.ensure_can_submit(session, user, a)
     adapter = adapter_for(run.destination_url, settings)
     if adapter is None or adapter.name != run.adapter:
         raise ConflictError("The destination site is no longer supported.")
@@ -380,6 +401,16 @@ async def submit(
             StatusActor.AUTOMATION,
             f"Submitted by CareerPilot on {host_of(run.destination_url)} after your explicit "
             f"confirmation (reference {outcome.confirmation_reference}).",
+        )
+        await approval.mark_submitted(
+            session,
+            user,
+            a,
+            actor=StatusActor.AUTOMATION,
+            message=f"Submitted by CareerPilot on {host_of(run.destination_url)} after your "
+            "explicit confirmation.",
+            reference=outcome.confirmation_reference,
+            run_id=str(run.id),
         )
         if not any(f.status == FollowUpStatus.PENDING for f in a.follow_ups):
             applications._add_reminder(

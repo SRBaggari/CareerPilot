@@ -13,12 +13,14 @@ from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.applications import approval
 from app.applications.models import (
     APPROVAL_REQUIRED_STATUSES,
     PRE_SUBMISSION,
     Application,
     ApplicationStatus,
     ApplicationStatusHistory,
+    ApprovalState,
     FollowUp,
     FollowUpChannel,
     FollowUpStatus,
@@ -313,6 +315,7 @@ def _summary(
         discovered_at=a.discovered_at,
         applied_at=a.submitted_at,
         approved_at=a.approved_at,
+        approval_state=a.approval_state,
         updated_at=a.updated_at,
         next_interview_at=min(upcoming, default=None),
         next_follow_up_at=min((f.due_at for f in pending if f.due_at), default=None),
@@ -632,6 +635,9 @@ async def update(
 
     for name, value in changes.items():
         setattr(a, name, value)
+    if a.approval_state == ApprovalState.APPROVED:
+        _, snapshot = await approval.build(session, user, a)
+        await approval.invalidate_if_changed(session, user, a, snapshot)
     await session.commit()
     return await _out(session, user, application_id)
 
@@ -643,6 +649,9 @@ async def change_status(
     target = payload.status
     if target == a.status:
         return await _out(session, user, application_id)
+    if target == S.SUBMITTED and a.submitted_at is None:
+        # Approved, unchanged since approval, nothing missing or unverified (409 otherwise).
+        await approval.ensure_can_submit(session, user, a)
     if target not in allowed_statuses(a):
         if target in SUBMITTED_STAGES and a.approved_at is None:
             reason = (
@@ -664,38 +673,12 @@ async def change_status(
                 )
             submitted = a.approved_at
         a.submitted_at = submitted
+        await approval.mark_submitted(
+            session, user, a, actor=StatusActor.USER, message="You recorded it as submitted."
+        )
         if not any(f.status == FollowUpStatus.PENDING for f in a.follow_ups):
             _add_reminder(a, "Check in on your application", submitted + CHECK_IN_AFTER)
     _history(a, target, StatusActor.USER, payload.note)
-    await session.commit()
-    return await _out(session, user, application_id)
-
-
-async def approve(session: AsyncSession, user: User, application_id: uuid.UUID) -> ApplicationOut:
-    """The candidate's explicit approval. It doesn't submit anything: it allows the
-    application to be marked as submitted once the candidate has submitted it."""
-    a = await _owned(session, user, application_id)
-    answers = (await _answers(session, a.candidate_profile_id, [a.job_id])).get(a.job_id, [])
-    _, blockers = readiness(a, answers)
-    if blockers:
-        raise ConflictError("Not ready to approve: " + " ".join(blockers))
-    now = _now()
-    a.approved_at = now
-    for doc in (a.tailored_resume, a.cover_letter):
-        if doc is not None and doc.status != DocumentStatus.APPROVED:
-            doc.status, doc.approved_at = DocumentStatus.APPROVED, now
-    note = (
-        "Approved by you. CareerPilot doesn't submit applications: submit it yourself, "
-        "then mark it as submitted."
-    )
-    if a.status == S.AWAITING_APPROVAL:
-        a.status_history.append(
-            ApplicationStatusHistory(
-                from_status=a.status, to_status=a.status, actor=StatusActor.USER, note=note
-            )
-        )
-    else:
-        _history(a, S.AWAITING_APPROVAL, StatusActor.USER, note)
     await session.commit()
     return await _out(session, user, application_id)
 
