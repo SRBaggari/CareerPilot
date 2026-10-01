@@ -400,7 +400,7 @@ export function ApplicationDetailPage({ applicationId }: { applicationId: string
                       {i.location ? ` · ${i.location}` : ""}
                     </span>
                     {i.status === "scheduled" ? (
-                      <span className="flex gap-1">
+                      <span className="flex flex-wrap gap-1">
                         <Button
                           size="sm"
                           disabled={busy}
@@ -502,7 +502,7 @@ export function ApplicationDetailPage({ applicationId }: { applicationId: string
                       {formatDate(f.due_at)} · {f.status}
                     </span>
                     {f.status === "pending" ? (
-                      <span className="flex gap-1">
+                      <span className="flex flex-wrap gap-1">
                         <Button
                           size="sm"
                           disabled={busy}

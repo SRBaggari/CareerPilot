@@ -104,3 +104,4 @@ export const importPosting = (source: string, identifier: string) =>
     `/api/v1/discovery/jobs/${encodeURIComponent(source)}/${encodeURIComponent(identifier)}/import`,
     { method: "POST" },
   );
+export const listSources = () => apiFetch<JobSourceStatus[]>("/api/v1/discovery/sources");

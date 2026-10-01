@@ -199,6 +199,8 @@ candidate data will be scoped by user ID. `AUTH_SECRET` is already reserved in
   `NEXT_PUBLIC_*` ones, so secrets cannot leak into the client bundle.
 - `src/lib/workflow.ts` defines the canonical workflow steps, including which ones are
   human-gated. Tests assert that approval comes before assisted application.
+- One app shell (sidebar on desktop, menu drawer on mobile) wraps every page; the dashboard
+  and section pages are composed from existing API endpoints. See [frontend.md](frontend.md).
 
 ## 9. Quality tooling
 
@@ -233,6 +235,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 7     | Browser-assisted applications: mock site, fill, review, confirm, audit (**done**) |
 | 7b    | Human-in-the-loop approval: states, review package, content-bound approval, submission gate (**done**) |
 | 8     | Agent orchestration: ten agents' explicit tools, validated state machine, human pauses, redacted execution log (**done**) |
+| 9     | Complete dashboard: app shell, dashboard, section pages, responsive layout, theme (**done**) |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

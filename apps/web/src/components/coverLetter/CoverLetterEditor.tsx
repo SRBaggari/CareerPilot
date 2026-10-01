@@ -106,7 +106,7 @@ export function CoverLetterEditor({
             onChange={(e) => setClosing(e.target.value)}
           />
         </Field>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="primary" onClick={() => void save()} disabled={saving}>
             {saving ? "Verifying…" : "Save"}
           </Button>

@@ -76,7 +76,7 @@ export function EvidenceList({ evidence, sourceType, subjectId, hint, onChanged 
           {evidence.map((ev) =>
             editing?.id === ev.id ? (
               <li key={ev.id}>
-                <form onSubmit={handleSave} className="flex gap-2">
+                <form onSubmit={handleSave} className="flex flex-wrap gap-2">
                   <input
                     aria-label="Edit highlight"
                     className={inputClass}

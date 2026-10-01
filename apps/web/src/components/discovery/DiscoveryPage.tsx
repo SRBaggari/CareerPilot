@@ -303,7 +303,7 @@ export function DiscoveryPage() {
               ))}
             </div>
           </fieldset>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button type="submit" variant="primary" disabled={busy}>
               {busy ? "Searching…" : "Search"}
             </Button>

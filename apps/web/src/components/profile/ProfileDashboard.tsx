@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { AppHeader } from "@/components/AppHeader";
 import { Button, Card } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import { createProfile, deleteProfile, getProfile, type Profile } from "@/lib/api/profile";
@@ -73,9 +72,7 @@ export function ProfileDashboard() {
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <AppHeader current="/profile" />
-
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
         {state.status === "loading" ? (
           <p className="text-sm text-zinc-500" role="status">
             Loading your profile…

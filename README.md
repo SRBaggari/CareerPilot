@@ -10,7 +10,9 @@ Master profile → Job discovery → JD analysis → Semantic matching → Skill
   → HUMAN APPROVAL → Browser-assisted application (stops before submit) → Tracking
 ```
 
-> **Status: Agent orchestration.** Master profile (`/profile`), resume upload with reviewed
+> **Status: Complete dashboard.** A responsive app with a dashboard (`/`) and sections for
+> the profile, jobs, job analysis, recommendations, applications, resume builder, cover
+> letters, application review and settings ([docs/frontend.md](docs/frontend.md)). Master profile (`/profile`), resume upload with reviewed
 > extraction, verified-evidence search, job discovery through provider adapters
 > (`/discover`), explained job recommendations (`/recommendations`), job description analysis (`/jobs`), explainable
 > candidate-job matching (`/jobs/[id]/match`), job-specific resume tailoring

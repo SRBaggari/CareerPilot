@@ -162,7 +162,7 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
       </Card>
 
       <Card id="job" title="Job and company">
-        <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 text-sm">
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[10rem_1fr]">
           <Row label="Job" value={r.job.title} />
           <Row label="Company" value={r.job.company} />
           <Row label="Location" value={r.job.location} />
@@ -171,7 +171,7 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
       </Card>
 
       <Card id="personal" title="Personal information">
-        <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 text-sm">
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[10rem_1fr]">
           <Row label="Name" value={r.personal.full_name} />
           <Row
             label="Email"
@@ -284,7 +284,7 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
                 onChange={(e) => setNote(e.target.value)}
               />
             </Field>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="primary"
                 disabled={busy || !confirmed || !r.can_approve}
@@ -329,7 +329,7 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
       <Card id="audit" title="Audit log" description="Every review, decision and submission.">
         <ol className="space-y-2 text-sm" aria-label="Audit events">
           {r.events.map((e) => (
-            <li key={e.id} className="flex gap-3">
+            <li key={e.id} className="flex flex-col gap-1 sm:flex-row sm:gap-3">
               <span className="w-36 shrink-0 text-xs text-zinc-500">{formatDateTime(e.at)}</span>
               <span className="w-28 shrink-0">
                 <Badge tone={e.actor === "user" ? "lock" : "neutral"}>

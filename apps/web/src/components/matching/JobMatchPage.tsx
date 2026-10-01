@@ -64,7 +64,7 @@ export function JobMatchPage({ jobId }: { jobId: string }) {
           {title ? <p className="text-zinc-600 dark:text-zinc-400">{title}</p> : null}
         </div>
         {state.status === "ready" ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link
               href={`/jobs/${jobId}/resume`}
               className="inline-flex items-center rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900"

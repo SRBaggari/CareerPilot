@@ -199,7 +199,7 @@ export function AgentRunPage({ runId }: { runId: string }) {
       ) : null}
 
       {open ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="primary"
             disabled={busy || (eligibility && !confirmEligibility)}
@@ -224,7 +224,7 @@ export function AgentRunPage({ runId }: { runId: string }) {
         title="Execution log"
         description={`${run.steps} tool calls. Every action, in order; secrets are never logged.`}
       >
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-left text-xs" aria-label="Execution log">
             <thead className="text-zinc-500">
               <tr>

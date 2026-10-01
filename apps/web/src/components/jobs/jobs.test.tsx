@@ -6,7 +6,7 @@ import { formatLongDate, formatSalary, groupRequirements } from "@/lib/jobs/labe
 
 import { stubApi } from "../profile/testApi";
 import { JobAnalysisView } from "./JobAnalysisView";
-import { JobsList } from "./JobsPage";
+import { JobAnalysisPage, JobsList, JobsPage } from "./JobsPage";
 import { NewJobForm } from "./NewJobForm";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
@@ -253,5 +253,43 @@ describe("helpers", () => {
       "/jobs/j1",
     );
     expect(screen.getByText("4 required")).toBeInTheDocument();
+  });
+});
+
+describe("JobsPage and JobAnalysisPage", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("lists jobs and links to analyzing a new one", async () => {
+    stubApi({
+      "GET /jobs": () => ({
+        status: 200,
+        body: [
+          {
+            id: "j1",
+            title: "ML Engineer",
+            company_name: "Northwind",
+            location: "Remote",
+            workplace_type: "remote",
+            employment_type: null,
+            application_deadline: null,
+            input_method: "pasted_text",
+            requirement_counts: { required: 3, preferred: 1, informational: 0 },
+            created_at: "2026-09-30T10:00:00Z",
+          },
+        ],
+      }),
+    });
+    render(<JobsPage />);
+    expect(await screen.findByRole("link", { name: /ML Engineer/ })).toHaveAttribute(
+      "href",
+      "/jobs/j1",
+    );
+    expect(screen.getByRole("link", { name: "Analyze a job" })).toHaveAttribute("href", "/analyze");
+  });
+
+  it("analyzes a job from its own page", () => {
+    render(<JobAnalysisPage />);
+    expect(screen.getByRole("heading", { level: 1, name: "Job Analysis" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Analyze a job" })).toBeVisible();
   });
 });

@@ -32,7 +32,10 @@ function Row({ label, value }: { label: string; value: string | null }) {
 
 function FileSummary({ file, label }: { file: ReviewFile; label: string }) {
   return (
-    <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 text-sm" aria-label={label}>
+    <dl
+      className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[10rem_1fr]"
+      aria-label={label}
+    >
       <Row label="File" value={file.file_name} />
       <Row label="Version" value={`Approved version ${file.version}`} />
       <Row label="Size" value={kb(file.size_bytes)} />
@@ -55,14 +58,14 @@ export function ReviewSections({ review }: { review: Review }) {
         description="Where the application will be sent."
         id="review-destination"
       >
-        <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 text-sm">
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[10rem_1fr]">
           <Row label="Website" value={review.destination.host} />
           <Row label="Application page" value={review.destination.url} />
           <Row label="Form sends to" value={review.destination.form_action} />
         </dl>
       </Card>
       <Card title="Personal information" id="review-personal">
-        <dl className="grid grid-cols-[10rem_1fr] gap-x-4 gap-y-1 text-sm">
+        <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[10rem_1fr]">
           <Row label="First name" value={p.first_name} />
           <Row label="Last name" value={p.last_name} />
           <Row label="Email" value={p.email} />
@@ -125,7 +128,7 @@ export function AuditLog({ events }: { events: AuditEvent[] }) {
   return (
     <ol className="space-y-2 text-sm" aria-label="Audit events">
       {events.map((e) => (
-        <li key={e.id} className="flex gap-3">
+        <li key={e.id} className="flex flex-col gap-1 sm:flex-row sm:gap-3">
           <span className="w-36 shrink-0 text-xs text-zinc-500">{formatDateTime(e.at)}</span>
           <span className="w-20 shrink-0">
             <Badge tone={e.actor === "user" ? "lock" : "neutral"}>

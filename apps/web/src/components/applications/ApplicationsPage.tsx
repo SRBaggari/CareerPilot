@@ -71,7 +71,7 @@ function Reminders({ dashboard, onDone }: { dashboard: Dashboard; onDone: () => 
                     · {f.company} · due {formatDate(f.due_at)}
                   </span>
                 </span>
-                <span className="flex gap-1">
+                <span className="flex flex-wrap gap-1">
                   <Button size="sm" onClick={() => void complete(f.application_id, f.id, "done")}>
                     Done
                   </Button>
@@ -316,7 +316,7 @@ export function ApplicationsPage() {
         </div>
       </Card>
 
-      <div className="flex gap-1" role="group" aria-label="View">
+      <div className="flex flex-wrap gap-1" role="group" aria-label="View">
         {(["board", "list"] as const).map((v) => (
           <Button
             key={v}
@@ -350,7 +350,7 @@ export function ApplicationsPage() {
       ) : null}
 
       {apps && apps.length > 0 && view === "board" ? (
-        <div className="flex gap-3 overflow-x-auto pb-2" aria-label="Status board">
+        <div className="relative flex gap-3 overflow-x-auto pb-2" aria-label="Status board">
           {BOARD_COLUMNS.filter(
             (s) => filters.statuses.length === 0 || filters.statuses.includes(s),
           ).map((s) => {
@@ -376,40 +376,42 @@ export function ApplicationsPage() {
       ) : null}
 
       {apps && apps.length > 0 && view === "list" ? (
-        <table className="w-full text-left text-sm" aria-label="Applications">
-          <thead className="text-xs text-zinc-500 uppercase">
-            <tr>
-              <th className="py-2">Position</th>
-              <th>Company</th>
-              <th>Status</th>
-              <th>Discovered</th>
-              <th>Applied</th>
-              <th>Next</th>
-            </tr>
-          </thead>
-          <tbody>
-            {apps.map((a) => (
-              <tr key={a.id} className="border-t border-zinc-200 dark:border-zinc-800">
-                <td className="py-2">
-                  <Link href={`/applications/${a.id}`} className="font-medium hover:underline">
-                    {a.position}
-                  </Link>
-                </td>
-                <td>{a.company}</td>
-                <td>{STATUS_LABELS[a.status]}</td>
-                <td>{formatDate(a.discovered_at)}</td>
-                <td>{formatDate(a.applied_at)}</td>
-                <td className="text-xs">
-                  {a.next_interview_at
-                    ? `Interview ${formatDate(a.next_interview_at)}`
-                    : a.next_follow_up_at
-                      ? `Follow up ${formatDate(a.next_follow_up_at)}`
-                      : "—"}
-                </td>
+        <div className="relative overflow-x-auto">
+          <table className="w-full min-w-[40rem] text-left text-sm" aria-label="Applications">
+            <thead className="text-xs text-zinc-500 uppercase">
+              <tr>
+                <th className="py-2">Position</th>
+                <th>Company</th>
+                <th>Status</th>
+                <th>Discovered</th>
+                <th>Applied</th>
+                <th>Next</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {apps.map((a) => (
+                <tr key={a.id} className="border-t border-zinc-200 dark:border-zinc-800">
+                  <td className="py-2">
+                    <Link href={`/applications/${a.id}`} className="font-medium hover:underline">
+                      {a.position}
+                    </Link>
+                  </td>
+                  <td>{a.company}</td>
+                  <td>{STATUS_LABELS[a.status]}</td>
+                  <td>{formatDate(a.discovered_at)}</td>
+                  <td>{formatDate(a.applied_at)}</td>
+                  <td className="text-xs">
+                    {a.next_interview_at
+                      ? `Interview ${formatDate(a.next_interview_at)}`
+                      : a.next_follow_up_at
+                        ? `Follow up ${formatDate(a.next_follow_up_at)}`
+                        : "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : null}
     </div>
   );

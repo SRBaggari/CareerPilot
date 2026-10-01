@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { AppHeader } from "@/components/AppHeader";
 import { Badge, Card, EmptyState } from "@/components/ui";
 import { listJobs, type JobSummary } from "@/lib/api/jobs";
 import { JOB_TYPE_LABELS, label, WORK_MODE_LABELS } from "@/lib/profile/options";
@@ -43,7 +42,6 @@ export function JobsList({ jobs }: { jobs: JobSummary[] }) {
 }
 
 export function JobsPage() {
-  const router = useRouter();
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
 
   useEffect(() => {
@@ -58,23 +56,53 @@ export function JobsPage() {
   }, []);
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
-      <AppHeader current="/jobs" />
-      <main className="mx-auto grid w-full max-w-6xl flex-1 gap-6 px-6 py-8 lg:grid-cols-[1fr_20rem]">
-        <Card
-          title="Analyze a job"
-          description="CareerPilot reads what the posting states - it never infers requirements that aren't there."
+    <main className="mx-auto w-full max-w-5xl flex-1 space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+            Jobs
+          </h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Every job you analyzed or imported. Open one to match, tailor and apply.
+          </p>
+        </div>
+        <Link
+          href="/analyze"
+          className="inline-flex items-center rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
         >
-          <NewJobForm onCreated={(job) => router.push(`/jobs/${job.id}`)} />
-        </Card>
-        <Card title="Your jobs">
-          {jobs === null ? (
-            <p className="text-sm text-zinc-500">Loading…</p>
-          ) : (
-            <JobsList jobs={jobs} />
-          )}
-        </Card>
-      </main>
-    </div>
+          Analyze a job
+        </Link>
+      </div>
+      <Card id="your-jobs" title="Your jobs">
+        {jobs === null ? (
+          <p role="status" className="text-sm text-zinc-500">
+            Loading…
+          </p>
+        ) : (
+          <JobsList jobs={jobs} />
+        )}
+      </Card>
+    </main>
+  );
+}
+
+/** Job Analysis: paste a posting (or enter it) and see what it actually requires. */
+export function JobAnalysisPage() {
+  const router = useRouter();
+  return (
+    <main className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 py-6 sm:px-6 sm:py-8">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
+          Job Analysis
+        </h1>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Paste a job description. CareerPilot reads what the posting states and never infers
+          requirements that aren&apos;t there.
+        </p>
+      </div>
+      <Card id="analyze" title="Analyze a job">
+        <NewJobForm onCreated={(job) => router.push(`/jobs/${job.id}`)} />
+      </Card>
+    </main>
   );
 }

@@ -60,7 +60,7 @@ function ClaimListEditor({
                 {error}
               </p>
             ) : null}
-            <div className="flex gap-1">
+            <div className="flex flex-wrap gap-1">
               <Button
                 size="sm"
                 variant="ghost"
@@ -247,7 +247,7 @@ export function ResumeEditor({
           />
         </Card>
       ))}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button variant="primary" onClick={() => void save()} disabled={saving}>
           {saving ? "Verifying…" : "Save changes"}
         </Button>
