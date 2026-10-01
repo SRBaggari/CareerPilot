@@ -1,6 +1,7 @@
 """Registry of ORM models. Importing this module registers every table on ``Base.metadata``
 (used by Alembic autogenerate and by mapper configuration)."""
 
+from app.agent.models import AgentActionLog, AgentRun
 from app.ai.models import AIExecutionLog
 from app.applications.models import (
     Application,
@@ -43,6 +44,8 @@ from app.verification.models import VerificationReport
 __all__ = [
     "AIExecutionLog",
     "Achievement",
+    "AgentActionLog",
+    "AgentRun",
     "Application",
     "ApplicationAnswer",
     "ApplicationApproval",

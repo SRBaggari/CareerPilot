@@ -174,6 +174,17 @@ to that evidence verbatim; everything else unsupported is rejected and audited. 
   challenges stop the request (see [job-discovery.md](job-discovery.md)).
 - Browser session state is treated as a secret (git-ignored, never logged).
 
+## 6b. Agent orchestration _(implemented; see [agent.md](agent.md))_
+
+- One orchestrator coordinates ten agents (profile, discovery, analysis, matching, resume,
+  cover letter, claim verification, application preparation, human approval, tracking)
+  through explicit tools that call the existing services.
+- A pure state machine (DISCOVER → … → TRACK) validates every transition against facts
+  read fresh from the database; the agent stops for a human instead of guessing, and
+  never approves or submits.
+- No autonomous loops: bounded advancing on request, a per-run tool-call limit.
+- Every action is logged in `agent_action_logs`, redacted so no secret is stored.
+
 ## 7. Authentication _(planned)_
 
 Auth.js (NextAuth v5) in the Next.js app manages sign-in and sessions. The backend will verify a
@@ -221,6 +232,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 6c    | Application tracker: lifecycle with approval gate, board, timeline, reminders (**done**) |
 | 7     | Browser-assisted applications: mock site, fill, review, confirm, audit (**done**) |
 | 7b    | Human-in-the-loop approval: states, review package, content-bound approval, submission gate (**done**) |
+| 8     | Agent orchestration: ten agents' explicit tools, validated state machine, human pauses, redacted execution log (**done**) |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

@@ -10,7 +10,7 @@ Master profile → Job discovery → JD analysis → Semantic matching → Skill
   → HUMAN APPROVAL → Browser-assisted application (stops before submit) → Tracking
 ```
 
-> **Status: Human-in-the-loop approval.** Master profile (`/profile`), resume upload with reviewed
+> **Status: Agent orchestration.** Master profile (`/profile`), resume upload with reviewed
 > extraction, verified-evidence search, job discovery through provider adapters
 > (`/discover`), explained job recommendations (`/recommendations`), job description analysis (`/jobs`), explainable
 > candidate-job matching (`/jobs/[id]/match`), job-specific resume tailoring
@@ -19,10 +19,12 @@ Master profile → Job discovery → JD analysis → Semantic matching → Skill
 > tracker with a board, timeline and follow-up reminders (`/applications`),
 > browser-assisted applications that fill a supported site, pause for a final review and
 > submit only after explicit confirmation (`/applications/[id]/assist`), explicit
-> content-bound approval with a full pre-submission review (`/applications/[id]/review`), and an
+> content-bound approval with a full pre-submission review (`/applications/[id]/review`), an
+> application agent that orchestrates all of it through a validated state machine and
+> stops for you whenever it needs you (`/agent`), and an
 > independent claim verification engine with a claim checker (`/verify`). Job sources and
 > application sites are development mocks only; no real provider is connected yet.
-> See [docs/human-approval.md](docs/human-approval.md),
+> See [docs/agent.md](docs/agent.md), [docs/human-approval.md](docs/human-approval.md),
 > [docs/browser-assistance.md](docs/browser-assistance.md),
 > [docs/application-tracker.md](docs/application-tracker.md),
 > [docs/recommendations.md](docs/recommendations.md),

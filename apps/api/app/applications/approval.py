@@ -158,6 +158,7 @@ class ReviewPackage(BaseModel):
     resume: DocumentReview | None
     cover_letter: DocumentReview | None
     answers: list[AnswerReview]
+    unanswered: list[str]  # questions with no answer yet
     issues: list[Issue]
     content_hash: str  # the version you're looking at; approve with this
     approval: CurrentApproval | None
@@ -393,6 +394,7 @@ async def build(
         resume=resume,
         cover_letter=letter,
         answers=answers,
+        unanswered=unanswered,
         issues=issues,
         content_hash=current,
         approval=approval,

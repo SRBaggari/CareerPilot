@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.routes import (
+    agent,
     application_answers,
     applications,
     assisted_applications,
@@ -32,3 +33,4 @@ api_router.include_router(discovery.router)
 api_router.include_router(recommendations.router)
 api_router.include_router(applications.router)
 api_router.include_router(assisted_applications.router)
+api_router.include_router(agent.router)
