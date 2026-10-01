@@ -9,6 +9,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from app.ai.provider import LLMJsonResult, LLMProvider
+from app.ai.untrusted import fence, restore, with_rules
 from app.jobs.analysis.extracted import ExtractedRequirement, JobExtraction, SalaryInfo
 from app.jobs.models import RequirementImportance, RequirementType, SalaryPeriod
 from app.profiles.models import EmploymentType, WorkplaceType
@@ -130,8 +131,8 @@ class LLMJobAnalyzer:
 
     async def analyze(self, text: str) -> tuple[JobExtraction, LLMJsonResult]:
         result = await self.provider.complete_json(
-            system=SYSTEM_PROMPT,
-            prompt=f"<job_description>\n{text}\n</job_description>\n\nExtract it into the schema.",
+            system=with_rules(SYSTEM_PROMPT),
+            prompt=f"{fence('job_description', text)}\n\nExtract it into the schema.",
             schema=JOB_SCHEMA,
         )
-        return to_extraction(result.data), result
+        return to_extraction(restore(result.data)), result

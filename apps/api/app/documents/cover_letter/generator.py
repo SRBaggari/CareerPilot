@@ -12,13 +12,13 @@ unapproved sentences are regenerated (``revise``) or removed by the service.
   output), and can rewrite sentences the engine rejected.
 """
 
-import json
 import re
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 from app.ai.provider import LLMJsonResult, LLMProvider
+from app.ai.untrusted import safe_json, with_rules
 from app.documents.cover_letter.content import (
     CoverLetterContent,
     LetterParagraph,
@@ -342,7 +342,7 @@ def build_prompt(ws: Workspace, report: MatchReportOut | None) -> str:
         },
     }
     return (
-        f"<job_and_candidate>\n{json.dumps(payload, indent=1)}\n</job_and_candidate>\n\n"
+        f"<job_and_candidate>\n{safe_json(payload, indent=1)}\n</job_and_candidate>\n\n"
         "Write the cover letter."
     )
 
@@ -400,7 +400,7 @@ class LLMLetterGenerator:
         self, ws: Workspace, report: MatchReportOut | None
     ) -> tuple[LetterDraft, LLMJsonResult]:
         result = await self.provider.complete_json(
-            system=SYSTEM_PROMPT, prompt=build_prompt(ws, report), schema=LETTER_SCHEMA
+            system=with_rules(SYSTEM_PROMPT), prompt=build_prompt(ws, report), schema=LETTER_SCHEMA
         )
         return map_letter(result.data, ws), result
 
@@ -417,9 +417,11 @@ class LLMLetterGenerator:
             }
             for sid, text, why, evidence in failed
         ]
-        prompt = f"<sentences>\n{json.dumps(items, indent=1)}\n</sentences>\n\nRevise them."
+        prompt = f"<sentences>\n{safe_json(items, indent=1)}\n</sentences>\n\nRevise them."
         result = await self.provider.complete_json(
-            system=f"{SYSTEM_PROMPT}\n\n{REVISE_PROMPT}", prompt=prompt, schema=REVISE_SCHEMA
+            system=with_rules(f"{SYSTEM_PROMPT}\n\n{REVISE_PROMPT}"),
+            prompt=prompt,
+            schema=REVISE_SCHEMA,
         )
         offered = {sid: {e.id: e for e in evidence} for sid, _, _, evidence in failed}
         revisions = []

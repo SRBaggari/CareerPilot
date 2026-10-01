@@ -4,6 +4,7 @@ Imported postings go through the same job analysis as a pasted description, so m
 resumes, cover letters and answers work on them with no discovery-specific code.
 """
 
+import logging
 import uuid
 from dataclasses import asdict
 
@@ -28,6 +29,8 @@ from app.jobs import service as jobs
 from app.jobs.models import Job, JobSource
 from app.jobs.schemas import JobAnalyzeIn
 from app.users.models import User
+
+logger = logging.getLogger(__name__)
 
 
 def sources(registry: ProviderRegistry) -> list[SourceOut]:
@@ -100,7 +103,11 @@ async def _fetch(registry: ProviderRegistry, source: str, identifier: str) -> No
     except AccessDenied as exc:
         raise ServiceUnavailableError(f"{provider.display_name}: {exc}") from exc
     except ProviderError as exc:
-        raise ServiceUnavailableError(f"{provider.display_name} is unavailable: {exc}") from exc
+        # Provider errors can carry URLs (and credentials in them): log, don't echo.
+        logger.warning("Job source %s failed: %s", provider.name, exc)
+        raise ServiceUnavailableError(
+            f"{provider.display_name} is unavailable right now. Try again later."
+        ) from exc
     if job is None:
         raise NotFoundError("That posting wasn't found at the source.")
     return filters.enrich(job)

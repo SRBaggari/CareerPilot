@@ -39,7 +39,8 @@ class MockSiteAdapter:
     def supports(self, url: str, settings: Settings) -> bool:
         if not settings.automation_mock_site_url or settings.app_env == "production":
             return False
-        return urlparse(url).netloc == urlparse(settings.automation_mock_site_url).netloc
+        target, mock = urlparse(url), urlparse(settings.automation_mock_site_url)
+        return (target.scheme, target.netloc) == (mock.scheme, mock.netloc)
 
     async def detect(self, page: Page) -> DetectedForm:
         found: dict[str, Any] | None = await page.evaluate(_DETECT)

@@ -4,6 +4,7 @@ grounding check and user review as the rule-based parser's."""
 from typing import Any
 
 from app.ai.provider import LLMJsonResult, LLMProvider
+from app.ai.untrusted import fence, restore, with_rules
 from app.profiles.models import SuggestionSection
 from app.resumes.parsed import ParsedItem, ParsedResume, ParsedSkill
 
@@ -172,8 +173,8 @@ class LLMResumeParser:
 
     async def parse(self, text: str) -> tuple[ParsedResume, LLMJsonResult]:
         result = await self.provider.complete_json(
-            system=SYSTEM_PROMPT,
-            prompt=f"<resume>\n{text}\n</resume>\n\nExtract the resume into the schema.",
+            system=with_rules(SYSTEM_PROMPT),
+            prompt=f"{fence('resume', text)}\n\nExtract the resume into the schema.",
             schema=RESUME_SCHEMA,
         )
-        return to_parsed_resume(result.data), result
+        return to_parsed_resume(restore(result.data)), result

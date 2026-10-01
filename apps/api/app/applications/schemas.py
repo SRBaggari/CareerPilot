@@ -1,6 +1,7 @@
 import uuid
 from datetime import date, datetime
 from typing import Literal
+from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -17,9 +18,13 @@ from app.documents.models import DocumentStatus
 
 
 def _http(value: str | None) -> str | None:
-    if value is not None and value and not value.startswith(("https://", "http://")):
+    """An http(s) URL with a host, or None (never javascript:, data:, file: ...)."""
+    if not value:
+        return None
+    parts = urlparse(value.strip())
+    if parts.scheme not in ("http", "https") or not parts.hostname:
         raise ValueError("Must be an http(s) URL.")
-    return value or None
+    return value.strip()
 
 
 # --- Input ------------------------------------------------------------------------------------

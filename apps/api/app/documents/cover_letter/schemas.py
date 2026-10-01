@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
@@ -51,5 +51,5 @@ class CoverLetterEdit(BaseModel):
     from the job and profile; every sentence is verified before anything is saved."""
 
     greeting: str = Field(min_length=1, max_length=200)
-    paragraphs: list[str] = Field(min_length=1, max_length=8)
+    paragraphs: list[Annotated[str, Field(max_length=3000)]] = Field(min_length=1, max_length=8)
     closing: str = Field(min_length=1, max_length=100)

@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 import anthropic
 
+from app.ai.untrusted import UNTRUSTED_DATA_RULES, with_rules
 from app.core.config import Settings
 
 
@@ -47,6 +48,8 @@ class AnthropicProvider:
         self, *, system: str, prompt: str, schema: dict[str, Any], max_tokens: int = 16000
     ) -> LLMJsonResult:
         started = time.perf_counter()
+        # Every call states that tagged data is never instructions (prompt injection).
+        system = with_rules(system) if UNTRUSTED_DATA_RULES not in system else system
         try:
             response = await self._client.beta.messages.create(
                 model=self.model,

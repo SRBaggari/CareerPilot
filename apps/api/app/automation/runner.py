@@ -10,6 +10,7 @@ read it back, and press submit only if the form reads back to exactly the confir
 The only request allowed to send data is the form's own submission, after the click.
 """
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -24,6 +25,7 @@ from playwright.async_api import (
     FilePayload,
     Page,
     Route,
+    WebSocketRoute,
     async_playwright,
 )
 
@@ -33,6 +35,8 @@ from app.automation.models import AuditActor
 from app.automation.plan import FillPlan, Materials, Problem, build_review, plan_fill
 from app.automation.review import Destination, Review, review_hash
 from app.core.config import Settings
+
+logger = logging.getLogger(__name__)
 
 _READ_BACK = """async (ids) => {
   const out = {};
@@ -91,41 +95,96 @@ class Outcome:
 class _Session:
     """One open page, with the request gate."""
 
-    def __init__(self, page: Page, outcome: Outcome) -> None:
+    def __init__(self, page: Page, outcome: Outcome, origin: str) -> None:
         self.page = page
         self.outcome = outcome
+        self.origin = origin  # the destination site; nothing else is ever contacted
         self.allowed_submission: str | None = None  # the form action, once armed
+        self.external: set[str] = set()
 
     async def gate(self, route: Route) -> None:
         request = route.request
-        if request.method in ("GET", "HEAD"):
+        same_site = _origin(request.url) == self.origin
+        main_navigation = request.is_navigation_request() and request.frame == self.page.main_frame
+        if request.method in ("GET", "HEAD") and same_site:
             await route.continue_()
             return
-        target = request.url.split("#")[0].split("?")[0]
-        if self.allowed_submission is not None and target == self.allowed_submission:
-            self.allowed_submission = None  # exactly one submission
+        if request.method in ("GET", "HEAD") and not main_navigation:
+            # Other sites (trackers, CDNs, internal addresses) are never contacted, so a
+            # page script can't send the filled form out or reach the server's network.
+            host = urlparse(request.url).netloc
+            if host not in self.external:
+                self.external.add(host)
+                self.outcome.log(
+                    "blocked_external",
+                    f"Didn't load content from {host or 'another site'}.",
+                    host=host,
+                )
+            await route.abort("blockedbyclient")
+            return
+        target = _clean(request.url)
+        if (
+            self.allowed_submission is not None
+            and target == self.allowed_submission
+            and main_navigation
+        ):
+            self.allowed_submission = None  # exactly one submission: the form's own
             await route.continue_()
             return
-        self.outcome.blocked.append(f"{request.method} {request.url}")
+        self.outcome.blocked.append(f"{request.method} {target}")
         self.outcome.log(
             "blocked_request",
             f"Blocked a {request.method} request the page tried to send.",
             method=request.method,
-            url=request.url,
+            url=target,
         )
         await route.abort("blockedbyclient")
 
+    async def popup(self, page: Page) -> None:
+        """A page that opens another window is unsafe; the window is closed at once."""
+        if page == self.page:
+            return
+        self.outcome.blocked.append(f"POPUP {_clean(page.url)}")
+        self.outcome.log("blocked_popup", "The page tried to open another window.")
+        await page.close()
+
+
+def _origin(url: str) -> str:
+    parts = urlparse(url)
+    return f"{parts.scheme}://{parts.netloc}".lower()
+
+
+def _clean(url: str) -> str:
+    """A URL without its query or fragment (which may carry data or tokens) for logs."""
+    return url.split("#")[0].split("?")[0]
+
+
+def _by_id(field_id: str) -> str:
+    """A selector for an element id the page chose (escaped: never interpreted as CSS)."""
+    escaped = field_id.replace("\\", "\\\\").replace('"', '\\"')
+    return f'[id="{escaped}"]'
+
+
+async def _close_websocket(ws: WebSocketRoute) -> None:
+    await ws.close()
+
 
 @asynccontextmanager
-async def _browser(settings: Settings, outcome: Outcome) -> AsyncIterator[_Session]:
+async def _browser(settings: Settings, outcome: Outcome, url: str) -> AsyncIterator[_Session]:
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=settings.automation_headless)
         try:
-            context = await browser.new_context(accept_downloads=False)
+            context = await browser.new_context(
+                accept_downloads=False,
+                service_workers="block",  # their requests would bypass the gate
+            )
             context.set_default_timeout(settings.automation_timeout_ms)
             page = await context.new_page()
-            session = _Session(page, outcome)
-            await page.route("**/*", session.gate)
+            session = _Session(page, outcome, _origin(url))
+            # The gate covers every page in the context (popups too) and every request.
+            await context.route("**/*", session.gate)
+            await context.route_web_socket("**/*", _close_websocket)
+            context.on("page", session.popup)
             yield session
         finally:
             await browser.close()
@@ -135,16 +194,24 @@ async def _browser(settings: Settings, outcome: Outcome) -> AsyncIterator[_Sessi
 async def _open(
     session: _Session, url: str, adapter: SiteAdapter, outcome: Outcome
 ) -> DetectedForm | None:
-    outcome.log("open_page", f"Opened {host_of(url)}.", url=url)
+    outcome.log("open_page", f"Opened {host_of(url)}.", url=_clean(url))
     response = await session.page.goto(url, wait_until="load")
+    if _origin(session.page.url) != session.origin:
+        outcome.stop(
+            "redirected",
+            f"The page sent the browser to another site ({host_of(session.page.url)}). "
+            "CareerPilot only fills pages on the site you approved, so it stopped.",
+            url=_clean(session.page.url),
+        )
+        return None
     try:
         await check_page(session.page, response)
         form = await adapter.detect(session.page)
     except Blocked as exc:
-        outcome.stop("access_control", str(exc), url=session.page.url)
+        outcome.stop("access_control", str(exc), url=_clean(session.page.url))
         return None
     except Unsupported as exc:
-        outcome.stop("unsupported_form", str(exc), url=session.page.url)
+        outcome.stop("unsupported_form", str(exc), url=_clean(session.page.url))
         return None
     outcome.log(
         "detected_fields",
@@ -158,7 +225,7 @@ async def _fill(session: _Session, form: DetectedForm, plan: FillPlan, outcome: 
     page = session.page
     kinds = {f.field_id: f for f in form.fields}
     for field_id, value in plan.values.items():
-        control = page.locator(f"#{field_id}")
+        control = page.locator(_by_id(field_id))
         if kinds[field_id].kind == "select":
             await control.select_option(label=value)
         else:
@@ -174,7 +241,7 @@ async def _fill(session: _Session, form: DetectedForm, plan: FillPlan, outcome: 
             "mimeType": "application/pdf",
             "buffer": document.data,
         }
-        await page.locator(f"#{field_id}").set_input_files(payload)
+        await page.locator(_by_id(field_id)).set_input_files(payload)
         label = "resume" if document.kind == "resume" else "cover letter"
         outcome.log(
             f"attached_{document.kind}",
@@ -243,7 +310,7 @@ async def prepare(
 ) -> Outcome:
     outcome = Outcome()
     try:
-        async with _browser(settings, outcome) as session:
+        async with _browser(settings, outcome, url) as session:
             result = await _fill_and_review(session, url, adapter, materials, inputs, outcome)
             # Give page scripts a moment: a page that tries to send the form by itself is
             # blocked, and treated as unsafe.
@@ -267,6 +334,10 @@ async def prepare(
     except PlaywrightError as exc:
         outcome.failed = True
         outcome.stop("error", _error_message(exc))
+    except Exception:  # an unexpected page or bug: fail safely, never half-done
+        logger.exception("Browser preparation failed")
+        outcome.failed = True
+        outcome.stop("error", "Something unexpected went wrong. Nothing was submitted.")
     _stop_if_unsafe(outcome)
     return outcome
 
@@ -281,7 +352,7 @@ async def submit(
 ) -> Outcome:
     outcome = Outcome()
     try:
-        async with _browser(settings, outcome) as session:
+        async with _browser(settings, outcome, url) as session:
             result = await _fill_and_review(session, url, adapter, materials, inputs, outcome)
             if outcome.blocked:
                 return outcome
@@ -328,6 +399,17 @@ async def submit(
         outcome.failed = True
         clicked = any(e.action == "submit_clicked" for e in outcome.events)
         outcome.stop("error", _error_message(exc, after_submit=clicked))
+    except Exception:  # an unexpected page or bug: fail safely
+        logger.exception("Browser submission failed")
+        outcome.failed = True
+        clicked = any(e.action == "submit_clicked" for e in outcome.events)
+        outcome.stop(
+            "error",
+            "Something unexpected went wrong after pressing submit: check the site before "
+            "trying again."
+            if clicked
+            else "Something unexpected went wrong. Nothing was submitted.",
+        )
     if outcome.confirmation_reference is None:
         _stop_if_unsafe(outcome)
     return outcome

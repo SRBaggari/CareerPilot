@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from app.ai.models import AIExecutionLog, AIExecutionStatus, AIOperation
 from app.ai.provider import LLMError, LLMProvider
+from app.ai.untrusted import injection_warning
 from app.applications.models import Application
 from app.core.config import Settings
 from app.core.errors import ConflictError, FieldErrors, NotFoundError
@@ -195,6 +196,9 @@ async def analyze_job(
     text = normalize_text(payload.description)
     raw, analyzer_name = await _extract(session, user, text, settings, llm)
     extraction = ground(raw, text)
+    # The posting is untrusted: instruction-like text is reported, never followed.
+    if (warning := injection_warning(text, "job description")) is not None:
+        extraction.warnings.insert(0, warning)
 
     title = payload.title or extraction.title
     company = payload.company_name or extraction.company_name

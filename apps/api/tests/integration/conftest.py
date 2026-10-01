@@ -124,7 +124,7 @@ def client_for(
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_resume_llm] = lambda: None
     app.dependency_overrides.update(overrides or {})
-    return httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="http://test")
+    return httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app), base_url="http://localhost")
 
 
 @pytest.fixture

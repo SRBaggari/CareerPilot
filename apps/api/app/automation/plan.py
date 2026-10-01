@@ -191,9 +191,9 @@ def build_review(
             mismatches.append(field_id)
     for field_id, document in plan.uploads.items():
         found = read_back.get(field_id) or {}
-        if found.get("size") != len(document.data) or (
-            found.get("sha256") and found["sha256"] != document.sha256
-        ):
+        # The hash must be present and match: without it, a different file of the same
+        # size could pass.
+        if found.get("size") != len(document.data) or found.get("sha256") != document.sha256:
             mismatches.append(field_id)
 
     by_id = {f.field_id: f for f in form.fields}

@@ -495,7 +495,8 @@ async def list_applications(
     if statuses:
         statement = statement.where(Application.status.in_(statuses))
     if q and q.strip():
-        pattern = f"%{q.strip().replace('%', '').replace('_', '')}%"
+        term = q.strip().replace("\\", "").replace("%", "").replace("_", "")
+        pattern = f"%{term}%"
         statement = statement.where(
             or_(
                 Job.company_name.ilike(pattern),

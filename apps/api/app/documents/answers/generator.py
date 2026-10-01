@@ -9,13 +9,13 @@ the claim verification engine does, and failed sentences are regenerated or remo
   output), and can rewrite sentences the engine rejected.
 """
 
-import json
 import re
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
 from app.ai.provider import LLMJsonResult, LLMProvider
+from app.ai.untrusted import safe_json, with_rules
 from app.documents.answers.questions import Understanding
 from app.documents.cover_letter.content import LetterSentence
 from app.documents.cover_letter.generator import (
@@ -248,7 +248,7 @@ def build_prompt(
         ],
     }
     return (
-        f"<question_and_evidence>\n{json.dumps(payload, indent=1)}\n</question_and_evidence>"
+        f"<question_and_evidence>\n{safe_json(payload, indent=1)}\n</question_and_evidence>"
         "\n\nAnswer the question."
     )
 
@@ -267,7 +267,7 @@ class LLMAnswerGenerator:
         max_words: int | None,
     ) -> tuple[AnswerDraft, LLMJsonResult]:
         result = await self.provider.complete_json(
-            system=SYSTEM_PROMPT,
+            system=with_rules(SYSTEM_PROMPT),
             prompt=build_prompt(ws, question, understanding, retrieved, max_words),
             schema=ANSWER_SCHEMA,
         )
@@ -291,9 +291,11 @@ class LLMAnswerGenerator:
             }
             for sid, text, why, evidence in failed
         ]
-        prompt = f"<sentences>\n{json.dumps(items, indent=1)}\n</sentences>\n\nRevise them."
+        prompt = f"<sentences>\n{safe_json(items, indent=1)}\n</sentences>\n\nRevise them."
         result = await self.provider.complete_json(
-            system=f"{SYSTEM_PROMPT}\n\n{REVISE_PROMPT}", prompt=prompt, schema=REVISE_SCHEMA
+            system=with_rules(f"{SYSTEM_PROMPT}\n\n{REVISE_PROMPT}"),
+            prompt=prompt,
+            schema=REVISE_SCHEMA,
         )
         offered = {sid: {e.id: e for e in evidence} for sid, _, _, evidence in failed}
         revisions = []

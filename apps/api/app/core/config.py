@@ -3,10 +3,11 @@
 Secrets are typed as ``SecretStr`` so they are never printed in logs or reprs.
 """
 
+import re
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -23,6 +24,11 @@ class Settings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000"]
     )
+    # Host headers the API answers to (blocks DNS-rebinding attacks on a local install).
+    allowed_hosts: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1", "[::1]"]
+    )
+    max_request_bytes: int = Field(default=10 * 1024 * 1024, gt=0)  # whole request body
 
     # Optional so the API can boot (and report "not configured") without a database.
     database_url: SecretStr | None = None
@@ -71,12 +77,27 @@ class Settings(BaseSettings):
     # The local mock application site (development and tests only; disabled in production).
     automation_mock_site_url: str | None = None
 
-    @field_validator("cors_origins", "discovery_providers", mode="before")
+    @field_validator("cors_origins", "discovery_providers", "allowed_hosts", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
         if isinstance(value, str):
             return [origin.strip() for origin in value.split(",") if origin.strip()]
         return value
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _exact_origins(cls, value: list[str]) -> list[str]:
+        """Only exact http(s) origins: a wildcard with credentials would trust every site."""
+        for origin in value:
+            if not re.fullmatch(r"https?://[A-Za-z0-9.\-\[\]:]+", origin):
+                raise ValueError(f"CORS origin must be an exact http(s) origin: {origin!r}")
+        return value
+
+    @model_validator(mode="after")
+    def _safe_in_production(self) -> "Settings":
+        if self.app_env == "production" and self.database_echo:
+            raise ValueError("DATABASE_ECHO would log personal data; it is refused in production.")
+        return self
 
     @field_validator("database_url")
     @classmethod

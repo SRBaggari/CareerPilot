@@ -7,6 +7,7 @@ This module never writes the master profile. Extracted information only becomes 
 the profile when the candidate accepts a suggestion (``app.profiles.suggestions``).
 """
 
+import asyncio
 import hashlib
 import re
 import uuid
@@ -18,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.models import AIExecutionLog, AIExecutionStatus, AIOperation
 from app.ai.provider import LLMError, LLMProvider
+from app.ai.untrusted import injection_warning
 from app.core.config import Settings
 from app.core.errors import ConflictError, FieldValidationError, NotFoundError
 from app.profiles import service as profiles
@@ -35,7 +37,12 @@ from app.profiles.models import (
 )
 from app.profiles.schemas import ProfileIn, SkillIn
 from app.profiles.suggestions import HIGHLIGHTS, MAX_HIGHLIGHTS, SECTION_SPECS, create_suggestion
-from app.resumes.extraction import ResumeFileError, detect_format, extract_text
+from app.resumes.extraction import (
+    EXTRACTION_TIMEOUT_SECONDS,
+    ResumeFileError,
+    detect_format,
+    extract_text,
+)
 from app.resumes.grounding import ground, normalize
 from app.resumes.heuristic import HeuristicResumeParser
 from app.resumes.llm_parser import LLMResumeParser
@@ -380,7 +387,14 @@ async def ingest_resume(
     storage.save(resume.storage_key, data)
     try:
         try:
-            extracted = extract_text(data, file_format)
+            # Parsing is CPU-bound: off the event loop, and bounded in time.
+            extracted = await asyncio.wait_for(
+                asyncio.to_thread(extract_text, data, file_format),
+                timeout=EXTRACTION_TIMEOUT_SECONDS,
+            )
+        except TimeoutError:
+            resume.parse_status = ParseStatus.FAILED
+            resume.parse_error = "The file took too long to read. Upload a simpler PDF or DOCX."
         except ResumeFileError as exc:
             resume.parse_status, resume.parse_error = ParseStatus.FAILED, str(exc)
         else:
@@ -390,6 +404,8 @@ async def ingest_resume(
             )
             grounded = ground(parsed, extracted.text)
             warnings += grounded.warnings
+            if (warning := injection_warning(extracted.text, "resume")) is not None:
+                warnings.insert(0, warning)
             warnings += await _create_suggestions(session, profile, resume, grounded, log_id)
             resume.parser_name = parser_name
             resume.parse_warnings = [w[:300] for w in warnings][:MAX_WARNINGS]

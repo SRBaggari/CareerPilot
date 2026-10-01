@@ -275,7 +275,7 @@ async def test_unexpected_errors_fail_the_run_without_leaking_secrets(
     )
     failed = await advance(api, run["id"])
     assert (failed["stage"], failed["status"]) == ("analyze", "failed")
-    assert "RuntimeError" in failed["last_error"] and "[REDACTED]" in failed["last_error"]
+    assert failed["last_error"] == "RuntimeError: an unexpected error stopped this stage."
 
     monkeypatch.setitem(tools.BY_STAGE, Stage.ANALYZE, original)
     retried = await advance(api, run["id"], max_stages=1)  # a failed run can be retried

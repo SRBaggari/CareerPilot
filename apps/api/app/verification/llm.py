@@ -6,11 +6,11 @@ the answer: a stricter status is always accepted; an upgrade to SUPPORTED is acc
 when the model cites offered evidence *and* that evidence passes every hard rule check.
 """
 
-import json
 from dataclasses import dataclass
 from typing import Any
 
 from app.ai.provider import LLMJsonResult, LLMProvider
+from app.ai.untrusted import safe_json, with_rules
 from app.documents.models import VerificationVerdict
 
 PROMPT_VERSION = "claim-verification-v1"
@@ -85,7 +85,7 @@ def build_prompt(items: list[ReviewItem]) -> str:
         }
         for item in items
     ]
-    body = json.dumps(claims, indent=1)
+    body = safe_json(claims, indent=1)
     return f"<claims>\n{body}\n</claims>\n\nVerify every claim."
 
 
@@ -96,7 +96,7 @@ class LLMReviewer:
 
     async def review(self, items: list[ReviewItem]) -> tuple[dict[str, Review], LLMJsonResult]:
         result = await self.provider.complete_json(
-            system=SYSTEM_PROMPT, prompt=build_prompt(items), schema=REVIEW_SCHEMA
+            system=with_rules(SYSTEM_PROMPT), prompt=build_prompt(items), schema=REVIEW_SCHEMA
         )
         reviews: dict[str, Review] = {}
         for entry in result.data.get("results") or []:

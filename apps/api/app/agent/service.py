@@ -10,10 +10,11 @@ Every tool call, transition, pause and error is written to the agent execution l
 inputs, outputs and errors redacted so no secret is ever stored.
 """
 
+import logging
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import func, select
@@ -27,6 +28,7 @@ from app.core.errors import ConflictError, DomainError, NotFoundError
 from app.profiles import service as profiles
 from app.users.models import User
 
+logger = logging.getLogger(__name__)
 MAX_STAGES_PER_ADVANCE = len(ORDER) - 1
 MAX_TOOL_CALLS_PER_RUN = 60
 OPEN = (RunStatus.READY, RunStatus.WAITING_FOR_HUMAN, RunStatus.FAILED)
@@ -44,7 +46,9 @@ class RunStart(BaseModel):
     source: str | None = Field(default=None, max_length=50)
     external_id: str | None = Field(default=None, max_length=200)
     include_cover_letter: bool = True
-    questions: list[str] = Field(default_factory=list, max_length=10)
+    questions: list[Annotated[str, Field(max_length=1000)]] = Field(
+        default_factory=list, max_length=10
+    )
 
     @model_validator(mode="after")
     def _one_target(self) -> "RunStart":
@@ -381,9 +385,10 @@ async def advance(
             await _fail(session, user, run_id, log, stage, str(exc))
             break
         except Exception as exc:
-            await _fail(
-                session, user, run_id, log, stage, f"{type(exc).__name__}: {exc}", rollback=True
-            )
+            # Details (which may include SQL or internal paths) go to the server log only.
+            logger.exception("Agent run %s failed at %s", run_id, stage.value)
+            message = f"{type(exc).__name__}: an unexpected error stopped this stage."
+            await _fail(session, user, run_id, log, stage, message, rollback=True)
             break
         if decision.pause is not None:
             await _pause(log, run, stage, decision.pause)

@@ -53,9 +53,11 @@ def site() -> Iterator[str]:
 def _clean_site() -> Iterator[None]:
     mock_site.SUBMISSIONS.clear()
     mock_site.QUESTIONS.clear()
+    mock_site.BEACONS.clear()
     yield
     mock_site.SUBMISSIONS.clear()
     mock_site.QUESTIONS.clear()
+    mock_site.BEACONS.clear()
 
 
 def _client(db: AsyncSession, user: User, site: str) -> httpx2.AsyncClient:
@@ -267,6 +269,8 @@ async def test_a_required_question_without_an_approved_answer_stops_for_the_cand
         ("ratelimited/x/apply", "access_control", "rate limiting"),
         ("changed/x/apply", "unsupported_form", "recognises"),
         ("autosubmit/x/apply", "unsafe_page", "tried to send"),
+        ("popup/x/apply", "unsafe_page", "tried to send"),
+        ("redirect/x/apply", "redirected", "another site"),
     ],
 )
 async def test_access_controls_and_unknown_forms_stop_with_an_explanation(
@@ -357,3 +361,14 @@ async def test_a_change_after_approval_stops_assisted_submission(
     assert tracked["approval_state"] == "ready_for_review" and tracked["applied_at"] is None
     again = await api.post(f"{APPS}/{app['id']}/assisted-runs", json={"inputs": {}})
     assert again.status_code == 409 and "Approve the application first" in again.text
+
+
+async def test_a_page_cannot_send_the_filled_form_to_another_site(
+    api: httpx2.AsyncClient, site: str
+) -> None:
+    app = await approved_application(api, f"{site}/exfil/x/apply", letter=False)
+    run = await start(api, app["id"], work_authorization="Yes")
+    assert run["status"] == "awaiting_review", run["stop_reason"]
+    assert mock_site.BEACONS == []  # the filled email never left the page
+    assert "blocked_external" in actions(run)
+    assert all("?" not in str(e["detail"].get("url", "")) for e in run["events"])

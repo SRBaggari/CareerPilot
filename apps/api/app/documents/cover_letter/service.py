@@ -426,9 +426,17 @@ async def _store_claims(
 # --- Output -----------------------------------------------------------------------------
 
 
-async def _evidence(session: AsyncSession, ids: set[uuid.UUID]) -> dict[uuid.UUID, CitedEvidence]:
+async def _evidence(
+    session: AsyncSession, profile_id: uuid.UUID, ids: set[uuid.UUID]
+) -> dict[uuid.UUID, CitedEvidence]:
+    """The candidate's own evidence among ``ids`` (never another candidate's)."""
     rows = await session.scalars(
-        with_sources(select(CandidateEvidence).where(CandidateEvidence.id.in_(ids)))
+        with_sources(
+            select(CandidateEvidence).where(
+                CandidateEvidence.id.in_(ids),
+                CandidateEvidence.candidate_profile_id == profile_id,
+            )
+        )
     )
     return {e.id: CitedEvidence(content=e.content, record_label=record_label(e)) for e in rows}
 
@@ -472,7 +480,8 @@ async def _out(session: AsyncSession, letter: CoverLetter) -> CoverLetterOut:
             removed=sum(1 for a in audit if a.outcome == "removed"),
             audit=audit,
         ),
-        notes=letter.notes, evidence=await _evidence(session, ids), report=report,
+        notes=letter.notes, report=report,
+        evidence=await _evidence(session, letter.candidate_profile_id, ids),
     )  # fmt: skip
 
 

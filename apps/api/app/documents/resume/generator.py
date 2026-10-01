@@ -6,7 +6,6 @@ from the profile, so no generator can add a job, project, or certification or al
 The output is a draft; every claim in it is verified before anything is kept.
 """
 
-import json
 import re
 import uuid
 from dataclasses import dataclass, field
@@ -14,6 +13,7 @@ from datetime import date
 from typing import Any
 
 from app.ai.provider import LLMJsonResult, LLMProvider
+from app.ai.untrusted import safe_json, with_rules
 from app.documents.resume.content import (
     AchievementEntry,
     CertificationEntry,
@@ -314,7 +314,7 @@ def build_prompt(ws: Workspace) -> str:
             if e.subject_id is None
         ],
     }
-    body = json.dumps(payload, indent=1)
+    body = safe_json(payload, indent=1)
     return f"<candidate_and_job>\n{body}\n</candidate_and_job>\n\nTailor the resume."
 
 
@@ -332,7 +332,7 @@ class LLMGenerator:
 
     async def generate(self, ws: Workspace) -> tuple[Draft, LLMJsonResult]:
         result = await self.provider.complete_json(
-            system=SYSTEM_PROMPT, prompt=build_prompt(ws), schema=TAILOR_SCHEMA
+            system=with_rules(SYSTEM_PROMPT), prompt=build_prompt(ws), schema=TAILOR_SCHEMA
         )
         return map_llm_output(result.data, ws), result
 

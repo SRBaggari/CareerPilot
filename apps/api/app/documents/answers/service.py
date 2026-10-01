@@ -630,7 +630,12 @@ async def _out(session: AsyncSession, answer: ApplicationAnswer) -> ApplicationA
     rows = {
         e.id: e
         for e in await session.scalars(
-            with_sources(select(CandidateEvidence).where(CandidateEvidence.id.in_(ids)))
+            with_sources(
+                select(CandidateEvidence).where(
+                    CandidateEvidence.id.in_(ids),
+                    CandidateEvidence.candidate_profile_id == answer.candidate_profile_id,
+                )
+            )
         )
     }
     used = [

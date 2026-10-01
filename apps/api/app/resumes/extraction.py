@@ -9,6 +9,7 @@ import re
 import unicodedata
 import zipfile
 from dataclasses import dataclass
+from typing import Any
 
 from docx import Document
 from docx.table import Table
@@ -19,10 +20,12 @@ from pypdf.errors import PdfReadError
 from app.profiles.models import DocumentFormat
 
 MAX_PDF_PAGES = 20
-MAX_DOCX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
+MAX_DOCX_UNCOMPRESSED_BYTES = 10 * 1024 * 1024  # a resume's XML is far smaller
 MAX_DOCX_ENTRIES = 2000
 MIN_TEXT_CHARS = 50
 MAX_TEXT_CHARS = 100_000
+_LEADING = bytes([0xEF, 0xBB, 0xBF, 0x20, 0x09, 0x0D, 0x0A])  # BOM and whitespace
+EXTRACTION_TIMEOUT_SECONDS = 20
 
 
 class ResumeFileError(ValueError):
@@ -40,7 +43,9 @@ def detect_format(data: bytes, filename: str) -> DocumentFormat:
     name = filename.lower()
     if name.endswith(".doc") or data.startswith(b"\xd0\xcf\x11\xe0"):
         raise ResumeFileError("Legacy .doc files aren't supported. Save it as .docx or PDF.")
-    if b"%PDF-" in data[:1024]:
+    # The signature must start the file (after optional whitespace or a BOM): a "%PDF-"
+    # buried in other content would let polyglot files through.
+    if data.lstrip(_LEADING).startswith(b"%PDF-"):
         detected = DocumentFormat.PDF
     elif data.startswith(b"PK\x03\x04"):
         detected = DocumentFormat.DOCX
@@ -77,6 +82,8 @@ def _extract_pdf(data: bytes) -> ExtractedText:
         raise
     except (PdfReadError, ValueError, KeyError, TypeError) as exc:
         raise ResumeFileError("The PDF could not be read. It may be damaged.") from exc
+    except Exception as exc:  # crafted PDFs raise many kinds (recursion, index, ...)
+        raise ResumeFileError("The PDF could not be read. It may be damaged.") from exc
     return ExtractedText("\n".join(pages), page_count)
 
 
@@ -85,7 +92,7 @@ def _check_docx_container(data: bytes) -> None:
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             entries = archive.infolist()
             names = {e.filename for e in entries}
-    except zipfile.BadZipFile as exc:
+    except (zipfile.BadZipFile, NotImplementedError, RuntimeError, ValueError) as exc:
         raise ResumeFileError("The DOCX file is damaged.") from exc
     if "word/document.xml" not in names:
         raise ResumeFileError("This file is not a Word document.")
@@ -108,6 +115,13 @@ def _extract_docx(data: bytes) -> ExtractedText:
     except Exception as exc:  # python-docx raises a variety of parser errors
         raise ResumeFileError("The DOCX file could not be read.") from exc
 
+    try:
+        return _docx_text(document)
+    except Exception as exc:
+        raise ResumeFileError("The DOCX file could not be read.") from exc
+
+
+def _docx_text(document: Any) -> ExtractedText:
     lines: list[str] = []
     for block in document.iter_inner_content():
         if isinstance(block, Paragraph):

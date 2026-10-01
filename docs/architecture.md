@@ -236,6 +236,7 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 7b    | Human-in-the-loop approval: states, review package, content-bound approval, submission gate (**done**) |
 | 8     | Agent orchestration: ten agents' explicit tools, validated state machine, human pauses, redacted execution log (**done**) |
 | 9     | Complete dashboard: app shell, dashboard, section pages, responsive layout, theme (**done**) |
+| 10    | Security audit: prompt-injection defenses, tenant isolation, HTTP hardening, browser gate (**done**; see [security.md](security.md)) |
 | 1     | Auth + candidate master profile + evidence model                      |
 | 2     | Resume ingestion (PDF/DOCX parsing) into evidence items               |
 | 3     | Provider abstraction + embeddings + job ingestion and JD analysis     |

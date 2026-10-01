@@ -251,7 +251,12 @@ async def get_report(session: AsyncSession, user: User, job_id: uuid.UUID) -> Ma
     evidence = {
         e.id: e
         for e in await session.scalars(
-            with_sources(select(CandidateEvidence).where(CandidateEvidence.id.in_(evidence_ids)))
+            with_sources(
+                select(CandidateEvidence).where(
+                    CandidateEvidence.id.in_(evidence_ids),
+                    CandidateEvidence.candidate_profile_id == match.candidate_profile_id,
+                )
+            )
         )
     }
     by_match: dict[uuid.UUID, list[MatchingEvidence]] = {}

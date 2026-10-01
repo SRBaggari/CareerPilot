@@ -7,10 +7,10 @@ only be MATCHED by evidence that names it, and structured checks (degree, eligib
 years) cannot be overridden.
 """
 
-import json
 from typing import Any
 
 from app.ai.provider import LLMJsonResult, LLMProvider
+from app.ai.untrusted import safe_json, with_rules
 from app.jobs.analysis.vocabulary import find_technologies
 from app.jobs.models import JobRequirement, RequirementType
 from app.matching.engine.judge import STATUS_RANK, Assessment, evidence_text
@@ -84,7 +84,7 @@ def build_prompt(items: list[JudgeItem]) -> str:
             )
         requirements.append(entry)
     return (
-        "<requirements>\n" + json.dumps(requirements, indent=1) + "\n</requirements>\n\n"
+        "<requirements>\n" + safe_json(requirements, indent=1) + "\n</requirements>\n\n"
         "Assess every requirement."
     )
 
@@ -141,7 +141,7 @@ class LLMJudge:
 
     async def assess(self, items: list[JudgeItem]) -> tuple[list[Assessment], LLMJsonResult]:
         result = await self.provider.complete_json(
-            system=SYSTEM_PROMPT, prompt=build_prompt(items), schema=JUDGE_SCHEMA
+            system=with_rules(SYSTEM_PROMPT), prompt=build_prompt(items), schema=JUDGE_SCHEMA
         )
         by_id: dict[str, dict[str, Any]] = {}
         for raw in result.data.get("assessments") or []:

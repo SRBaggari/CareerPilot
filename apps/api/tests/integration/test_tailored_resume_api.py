@@ -135,8 +135,17 @@ async def tailor(api: httpx2.AsyncClient, job_id: str) -> dict[str, Any]:
     return response.json()  # type: ignore[no-any-return]
 
 
+def _without_ids(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {k: _without_ids(v) for k, v in value.items() if not k.endswith(("_id", "_ids"))}
+    if isinstance(value, list):
+        return [_without_ids(v) for v in value]
+    return value
+
+
 def resume_text(resume: dict[str, Any]) -> str:
-    return json.dumps(resume["content"])
+    """The resume's words (not its random UUIDs, which can contain digits like 2019)."""
+    return json.dumps(_without_ids(resume["content"]))
 
 
 def all_claims(content: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
