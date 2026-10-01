@@ -19,6 +19,7 @@
     "typecheck:api": "cd apps/api && uv run mypy",
     "test": "npm run test --workspace web && npm run test:api",
     "test:api": "cd apps/api && uv run pytest",
+    "test:e2e": "cd apps/api && bash tests/e2e/run.sh",
     "format": "prettier --write . && cd apps/api && uv run ruff format .",
     "format:check": "prettier --check .",
     "db:up": "docker compose -f infra/docker-compose.yml up -d",

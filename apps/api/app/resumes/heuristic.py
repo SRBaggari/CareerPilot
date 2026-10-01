@@ -87,6 +87,10 @@ DEGREE_LEVELS = (
 # --- Helpers ------------------------------------------------------------------------------
 
 
+# A year with no month or numeric month next to it, e.g. "2022 - 2026" or "(2024)".
+YEAR_ONLY_RE = re.compile(r"(?<![A-Za-z]{3} )(?<![A-Za-z]{4} )(?<![/\d])(?:19|20)\d{2}(?![/\d])")
+
+
 def parse_date(token: str, *, is_end: bool = False) -> date | None:
     token = token.strip().lower().rstrip(".")
     if m := re.fullmatch(r"(\d{1,2})/(\d{4})", token):
@@ -282,7 +286,13 @@ def _project(entry: Entry) -> dict[str, Any] | None:
     all_text = " ".join(entry.raw)
     urls = [u.rstrip("/.") for u in URL_RE.findall(all_text) if "." in u]
     header = [URL_RE.sub("", line) for line in entry.header]
-    parts = fragments(header)
+    # "Title - subtitle | tech, list": the title runs up to the first " | ".
+    if header and " | " in header[0]:
+        title, rest = header[0].split(" | ", 1)
+        title = strip_dates(title).strip(" ,|:;-" + chr(0x2013) + chr(0x2014) + "()")
+        parts = [title, *fragments([rest, *header[1:]])] if title else fragments(header)
+    else:
+        parts = fragments(header)
     if not parts:
         return None
     start, end, _ = find_range(" ".join(entry.header))
@@ -307,10 +317,17 @@ def _single_line_items(lines: list[str]) -> list[str]:
     return items
 
 
+def _is_link(candidate: str) -> bool:
+    """A real link (scheme, www. or a path), not a dotted name such as "DeepLearning.AI"."""
+    return bool(re.match(r"(?i)https?://|www\.", candidate)) or "/" in candidate
+
+
 def _certification(line: str) -> dict[str, Any] | None:
     _, issued, _ = find_range(line)
-    urls = URL_RE.findall(line)
-    text = URL_RE.sub("", strip_dates(line))
+    urls = [u for u in URL_RE.findall(line) if _is_link(u)]
+    text = strip_dates(line)
+    for url in urls:
+        text = text.replace(url, "")
     parts = [p for p in re.split(r"\s+by\s+|\s+[|\u2013\u2014-]\s+|,\s+", text) if p.strip(" ()")]
     if not parts:
         return None
@@ -390,6 +407,12 @@ class HeuristicResumeParser:
                 result.items.append(
                     ParsedItem(SuggestionSection.CERTIFICATION, _clean(data), [], line)
                 )
+        if YEAR_ONLY_RE.search(text):
+            result.warnings.append(
+                "Some dates give only a year. Profile dates have months, so those were "
+                "recorded as January (starts) or December (ends): correct the months while "
+                "reviewing, so nothing more specific than your resume is claimed."
+            )
         for line in _single_line_items(sections.get(SectionKind.ACHIEVEMENTS, [])):
             result.items.append(
                 ParsedItem(SuggestionSection.ACHIEVEMENT, _clean(_achievement(line)), [], line)

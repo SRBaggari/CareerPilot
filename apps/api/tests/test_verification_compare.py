@@ -166,3 +166,14 @@ def test_a_number_about_something_else_is_not_a_contradiction() -> None:
     result = check("Reduced cloud costs by 30% with a RAG pipeline in Python.", RAG)
     assert result.verdict == U and result.veto
     assert "something else" in result.reason
+
+
+def test_a_metric_named_after_its_number_is_matched_to_the_same_metric() -> None:
+    cnn = EvidenceText(
+        "Trained a CNN in PyTorch to classify leaf diseases, reaching 92% validation accuracy.",
+        "Crop Disease Classifier",
+    )
+    same = check("I trained a PyTorch model with 92% validation accuracy.", cnn)
+    assert same.verdict == S, same.reason
+    borrowed = check("I reduced inference latency by 92%.", cnn)
+    assert borrowed.verdict != S, borrowed.reason

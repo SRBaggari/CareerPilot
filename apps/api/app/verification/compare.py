@@ -321,6 +321,7 @@ class _Quantity:
 
 _CLAUSE_BREAK = re.compile(r"[,;:()\n]|\.\s|\band\b|\bwhile\b")
 _ABOUT_WORDS = 4
+_AFTER_WORDS = 3
 
 
 def _quantities(text: str) -> list[_Quantity]:
@@ -330,7 +331,13 @@ def _quantities(text: str) -> list[_Quantity]:
         raw_number, raw_unit = match.group(1), match.group(2)
         unit = _unit(raw_unit)
         clause = _CLAUSE_BREAK.split(text[: match.start()])[-1]
-        about = frozenset(content_stems(" ".join(words(clause)[-_ABOUT_WORDS:])))
+        # What a number measures is named around it: "accuracy of 92%" or "92% validation
+        # accuracy". The words after it stay within the same clause.
+        after = _CLAUSE_BREAK.split(text[match.end() :])[0]
+        about = frozenset(
+            content_stems(" ".join(words(clause)[-_ABOUT_WORDS:]))
+            | content_stems(" ".join(words(after)[:_AFTER_WORDS]))
+        )
         written = (
             f"{raw_number}{raw_unit}" if unit in ("%", "x", "k")
             else f"{raw_number} {raw_unit.strip('+ ')}"

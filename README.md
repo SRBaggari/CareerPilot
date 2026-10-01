@@ -128,3 +128,15 @@ so never point it at your development database:
 cd apps/api
 TEST_DATABASE_URL=postgresql+asyncpg://careerpilot:careerpilot@localhost:5432/careerpilot_test uv run pytest
 ```
+
+### End-to-end tests
+
+- **API journey**: `tests/integration/test_e2e_journey.py` and `test_e2e_hallucination.py`
+  run with the integration tests. They cover a realistic candidate from upload to a tracked
+  application (including a headless-browser application on the mock site), and the
+  hallucination scenarios.
+- **Browser**: `npm run test:e2e` (with `E2E_ADMIN_DB` set to a PostgreSQL admin URL)
+  starts an isolated stack (a throwaway database, the mock site, the API and a production
+  web build) and drives the web app in Chromium.
+
+The latest results are in [docs/test-report.md](docs/test-report.md).

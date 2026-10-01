@@ -101,7 +101,8 @@ def test_heuristic_parser_extracts_every_section() -> None:
     skills = {s.name: s.category for s in parsed.skills}
     assert skills["C++"] == "programming_language"
     assert skills["React (Hooks, Redux)"] == "framework"  # commas inside () are kept
-    assert parsed.warnings == []
+    # The sample gives some dates as years only: the candidate is told to check the months.
+    assert [w[:30] for w in parsed.warnings] == ["Some dates give only a year. P"]
 
 
 @pytest.mark.parametrize("builder", [make_pdf, make_docx], ids=["pdf", "docx"])
