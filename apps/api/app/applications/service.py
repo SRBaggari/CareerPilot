@@ -647,6 +647,8 @@ async def change_status(
     session: AsyncSession, user: User, application_id: uuid.UUID, payload: StatusChange
 ) -> ApplicationOut:
     a = await _owned(session, user, application_id)
+    await approval.lock(session, a)
+    await approval.ensure_not_submitting(session, a)
     target = payload.status
     if target == a.status:
         return await _out(session, user, application_id)

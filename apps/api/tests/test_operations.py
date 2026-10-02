@@ -116,3 +116,36 @@ def test_configuration_errors_never_echo_secret_values() -> None:
             database_url=SecretStr("postgresql+asyncpg://u:hunter2-db-password@db/careerpilot"),
         )
     assert "NEVER-PRINTED" not in str(exc.value) and "hunter2" not in str(exc.value)
+
+
+def test_constraint_violations_are_a_generic_409() -> None:
+    from sqlalchemy.exc import IntegrityError
+
+    app = create_app(Settings(_env_file=None, app_env="test"))
+    race = APIRouter()
+
+    @race.get("/race")
+    async def _race() -> None:
+        orig = Exception('duplicate key value violates "uq_x" (email)=(asha@example.test)')
+        raise IntegrityError("INSERT ...", {"email": "asha@example.test"}, orig)
+
+    app.include_router(race)
+    response = TestClient(app, raise_server_exceptions=False).get("/race")
+    assert response.status_code == 409 and "Refresh and try again" in response.text
+    assert "asha" not in response.text and "uq_x" not in response.text
+
+
+def test_the_llm_client_is_shared_and_bounded() -> None:
+    from app.ai.provider import AnthropicProvider, get_llm_provider
+
+    settings = Settings(
+        _env_file=None,
+        app_env="test",
+        anthropic_api_key=SecretStr("sk-ant-test-not-a-real-key"),
+        llm_timeout_seconds=45,
+        llm_max_retries=0,
+    )
+    first, second = get_llm_provider(settings), get_llm_provider(settings)
+    assert isinstance(first, AnthropicProvider) and isinstance(second, AnthropicProvider)
+    assert first._client is second._client  # one connection pool per process
+    assert first._client.timeout == 45 and first._client.max_retries == 0

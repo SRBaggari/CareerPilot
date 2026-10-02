@@ -59,7 +59,7 @@ Examples of CONTRADICTED:
 
 **Generic self-praise** presented as fact ("passionate", "team player", "strong communication skills", "proven track record") is UNSUPPORTED unless the evidence says it.
 
-**Cover letter and application answer sentences** (`letter`, `answer`) may also be non-factual: a greeting, intent or courtesy. The engine approves one without evidence only if it states nothing about the candidate: no numbers, technologies, qualities, qualifiers or role words, no "I have…" or "my experience…", and no names other than the job and company. Anything else is verified like any claim. See [cover-letters.md](cover-letters.md).
+**Cover letter and application answer sentences** (`letter`, `answer`) may also be non-factual: a greeting, intent or courtesy. The engine approves one without evidence only if it states nothing about the candidate: no numbers, technologies, qualities, qualifiers or role words, no "I have…" or "my experience…", and no names other than the job and company. It is an allow-list: every word must be courtesy or intent vocabulary, the job title or the company, so "I'd bring…", "who has shipped…" or "my team won…" are verified like any claim. See [cover-letters.md](cover-letters.md).
 
 Numbers are compared by what they measure: the few words just before them. A real number
 from the evidence can't be attached to something else. "Reduced cloud costs by 30%" is
@@ -70,15 +70,25 @@ UNSUPPORTED when the only 30% in the evidence is about triage time.
 - **Verified evidence only.** Unconfirmed evidence is never used, even when it says exactly
   the same thing. The reason says so.
 - **Right scope.** A bullet can only rest on the evidence of the item it sits under.
-- **Vetoes.** Invented numbers and scale, names, role escalation, extra technologies,
-  qualifiers, contradictions and record-fact mismatches are hard failures. No later step
-  can overrule them.
+- **Vetoes.** These are hard failures that no later step can overrule:
+  - invented numbers, including number words ("fifty", "a dozen") and scale;
+  - outcomes, recognition and sole ownership the evidence doesn't state ("won", "award",
+    "adopted", "published", "single-handedly", "users");
+  - names, role escalation, extra technologies and qualifiers;
+  - contradictions and record-fact mismatches.
+- **Negation.** Evidence that denies something contradicts a claim that asserts it
+  ("Prototype chatbot; not deployed to production." contradicts "Deployed the chatbot to
+  production."), unless other evidence affirms it.
+- **Short skill names** ("Go", "R", "C") must appear as the technology, capitalized and not
+  merely at the start of a sentence, so "helped the team go live" is not Go.
 - **The LLM reviewer** (optional, `CLAIM_VERIFIER`) may always make a verdict stricter. It
   may upgrade a claim to SUPPORTED only when all of these hold:
   - the rules found no hard failure;
   - it cites evidence it was offered;
   - that evidence still passes every rule check;
-  - that evidence covers at least 30% of the claim's content.
+  - that evidence already partly supports the claim by the rules (at least 45% of its
+    content). The reviewer may judge a paraphrase faithful; it can't supply facts the
+    evidence lacks.
 
   An upgrade is recorded as `method: llm` with the reviewer's reason and the rule check
   that preceded it. A reviewer that approves everything cannot approve a hallucination;
@@ -86,6 +96,9 @@ UNSUPPORTED when the only 30% in the evidence is about triage time.
 - **Explicit re-citation.** A claim supported by evidence it didn't cite reports
   `evidence_source: retrieved` and says so in the reason. During resume generation, that
   claim then cites the evidence that supports it, and a note on the resume says so.
+- **Checked again before it counts.** Approving an application, and submitting it through
+  browser assistance, first re-verifies its resume and cover letter against the current
+  evidence and profile. A claim that no longer passes blocks the action.
 - **Reports are append-only.** Re-verifying adds a report and a new `claim_verifications`
   row per claim; it never edits old ones. If a resume no longer passes, it becomes
   `verification_failed` and its failing claims are marked `unsupported`. Its content is

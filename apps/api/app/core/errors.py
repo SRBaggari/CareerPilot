@@ -4,12 +4,14 @@ Services raise these instead of HTTPException so they stay independent of the we
 Validation errors use FastAPI's standard 422 shape so clients handle one format.
 """
 
+import logging
 from typing import Any
 
 from fastapi import FastAPI, Request, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
 
 
 class DomainError(Exception):
@@ -79,4 +81,16 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content={"detail": jsonable_encoder(errors)},
+        )
+
+    @app.exception_handler(IntegrityError)
+    async def _integrity(_: Request, exc: IntegrityError) -> JSONResponse:
+        # A database constraint refused a write, almost always because two requests raced
+        # on the same record. The constraint and its values go to the server log only.
+        logging.getLogger("careerpilot.errors").warning(
+            "Constraint refused a write: %s", type(exc.orig).__name__
+        )
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={"detail": "This changed at the same time elsewhere. Refresh and try again."},
         )

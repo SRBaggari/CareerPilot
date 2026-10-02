@@ -55,6 +55,15 @@ unexpected browser error), or `cancelled`. On success the application moves to
 **Submitted** with actor `automation` and the note "after your explicit confirmation", and a
 check-in reminder is added, exactly as when the candidate records a submission themselves.
 
+While a run is `submitting`, nothing else may change the application: rejecting or
+withdrawing approval, changing its status and starting another run are refused (409), so
+the outcome and the approval it relies on are always recorded together. If the browser
+fails mid-submission, or the server stops and a `submitting` run is more than 10 minutes
+old when the next run starts, the run becomes `failed` with the reason "the submission was
+interrupted, so CareerPilot can't tell whether the employer received it". It is never
+reported as not submitted. The Application Review screen shows a submitting run as busy and
+offers no "Try again".
+
 ## API
 
 | Method | Path | Purpose |

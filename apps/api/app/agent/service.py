@@ -32,6 +32,9 @@ logger = logging.getLogger(__name__)
 MAX_STAGES_PER_ADVANCE = len(ORDER) - 1
 MAX_TOOL_CALLS_PER_RUN = 60
 OPEN = (RunStatus.READY, RunStatus.WAITING_FOR_HUMAN, RunStatus.FAILED)
+# A run left 'running' this long was interrupted (a crash or a dropped request), so it may
+# be advanced again. Every tool call commits, which refreshes ``updated_at``.
+RUNNING_STALE_AFTER = timedelta(minutes=15)
 
 
 # --- Schemas ----------------------------------------------------------------------------------
@@ -281,7 +284,9 @@ async def start(session: AsyncSession, user: User, payload: RunStart, deps: Deps
 
 async def cancel(session: AsyncSession, user: User, run_id: uuid.UUID, deps: Deps) -> RunOut:
     run = await _owned(session, user, run_id, lock=True)
-    if run.status not in OPEN:
+    if run.status == RunStatus.RUNNING and not _stale(run):
+        raise ConflictError("This run is working. Cancel it once it stops.")
+    if run.status not in (*OPEN, RunStatus.RUNNING):
         raise ConflictError("Only an open run can be cancelled.")
     run.status, run.pause = RunStatus.CANCELLED, None
     await _Log(session, run, secrets_of(deps.settings)).write(
@@ -343,7 +348,9 @@ async def advance(
 ) -> RunOut:
     """Run stages until the agent needs a human, completes, fails, or reaches the limit."""
     run = await _owned(session, user, run_id, lock=True)
-    if run.status not in OPEN:
+    if run.status == RunStatus.RUNNING and not _stale(run):
+        raise ConflictError("This run is already working. Wait for it to stop, then refresh.")
+    if run.status not in (*OPEN, RunStatus.RUNNING):
         raise ConflictError(f"This run is {run.status.value}; start a new one.")
     secrets = secrets_of(deps.settings)
     log = _Log(session, run, secrets)
@@ -360,7 +367,9 @@ async def advance(
             else "You did not confirm eligibility.",
             status=ActionStatus.SUCCEEDED,
         )
-    run.status, run.pause, run.last_error = RunStatus.READY, None, None
+    # Claimed under the row lock and committed: a concurrent advance now sees RUNNING and is
+    # refused instead of running the same tools a second time.
+    run.status, run.pause, run.last_error = RunStatus.RUNNING, None, None
     await session.commit()
     ctx = Ctx(session=session, user=user, run=run, deps=deps)
 
@@ -420,7 +429,14 @@ async def advance(
         await session.commit()
         if run.stage == Stage.DONE:
             break
+    if run.status == RunStatus.RUNNING:  # stopped at max_stages: ready for the next advance
+        run.status = RunStatus.READY
+        await session.commit()
     return await get(session, user, run_id)
+
+
+def _stale(run: AgentRun) -> bool:
+    return run.updated_at < datetime.now(UTC) - RUNNING_STALE_AFTER
 
 
 async def _pause(log: _Log, run: AgentRun, stage: Stage, pause: Pause) -> None:

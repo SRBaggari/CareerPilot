@@ -24,9 +24,10 @@
 			header_up X-CareerPilot-User {http.auth.user.id}
 			header_up X-CareerPilot-Proxy-Secret {$AUTH_PROXY_SECRET}
 			header_up X-Request-ID {http.request.uuid}
-			# Generation and browser-assisted applications can take a while.
+			# Generation, approval (re-verification) and browser-assisted applications
+			# can take a while. Keep above (LLM_MAX_RETRIES + 1) x LLM_TIMEOUT_SECONDS.
 			transport http {
-				read_timeout 180s
+				read_timeout 300s
 			}
 		}
 	}

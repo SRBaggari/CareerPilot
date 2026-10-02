@@ -180,6 +180,10 @@ export function AssistPage({ applicationId }: { applicationId: string }) {
       if (updated.status === "submitted") setApp(await getApplication(applicationId));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Something went wrong. Please try again.");
+      // The request may have failed after the server acted (e.g. a proxy timeout during a
+      // submission): show the run as it is now, never as it was before.
+      const runs = await listRuns(applicationId).catch(() => null);
+      if (runs) setRun(runs[0] ?? null);
     } finally {
       setBusy(null);
     }
@@ -199,7 +203,9 @@ export function AssistPage({ applicationId }: { applicationId: string }) {
 
   const approved = app.approved_at !== null;
   const open = run && ["needs_input", "awaiting_review"].includes(run.status);
-  const canStart = approved && !app.applied_at && !open && run?.status !== "submitted";
+  const submitting = run?.status === "submitting";
+  const canStart =
+    approved && !app.applied_at && !open && !submitting && run?.status !== "submitted";
   const review = run?.status === "awaiting_review" ? run.review : null;
   const inputProblems =
     run?.status === "needs_input" ? run.problems.filter((p) => p.needs_input) : [];
@@ -229,6 +235,16 @@ export function AssistPage({ applicationId }: { applicationId: string }) {
           className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"
         >
           {error}
+        </p>
+      ) : null}
+
+      {submitting ? (
+        <p
+          role="status"
+          className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+        >
+          CareerPilot is submitting this application. Don&apos;t apply again elsewhere: reload this
+          page in a minute to see the result.
         </p>
       ) : null}
 

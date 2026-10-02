@@ -10,6 +10,7 @@ Preconditions, all enforced here:
 Every step is recorded in the run's append-only audit log.
 """
 
+import logging
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -19,6 +20,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.ai.embeddings import EmbeddingProvider
+from app.ai.provider import LLMProvider
 from app.applications import approval
 from app.applications import service as applications
 from app.applications.models import (
@@ -45,7 +48,16 @@ from app.documents.resume import service as resumes
 from app.profiles import service as profiles
 from app.users.models import User
 
+logger = logging.getLogger(__name__)
+
 OPEN = (RunStatus.NEEDS_INPUT, RunStatus.AWAITING_REVIEW)
+# A submission still "submitting" after this long was interrupted (a crash or restart while
+# the browser ran). The runner's own time limits are far shorter.
+SUBMITTING_STALE_AFTER = timedelta(minutes=10)
+MAYBE_SENT = (
+    "The submission was interrupted, so CareerPilot can't tell whether the employer received "
+    "it. Check the employer's site or your email before applying again."
+)
 
 
 def _now() -> datetime:
@@ -287,6 +299,9 @@ async def start(
     settings: Settings,
 ) -> RunOut:
     a = await applications._owned(session, user, application_id)
+    await approval.lock(session, a)
+    await _settle_interrupted(session, a.id)
+    await approval.ensure_not_submitting(session, a)
     await _check_application(session, user, a)
     url = a.application_url or a.job.url
     if not url:
@@ -313,6 +328,27 @@ async def start(
     )
     await _prepare(session, user, run, a, settings)
     return await _reload(session, user, run.id)
+
+
+async def _settle_interrupted(session: AsyncSession, application_id: uuid.UUID) -> None:
+    """Mark submissions that were interrupted long ago as failed, saying they may have been
+    sent, so they neither block the application forever nor read as "not submitted"."""
+    stale = await session.scalars(
+        select(ApplicationRun)
+        .where(
+            ApplicationRun.application_id == application_id,
+            ApplicationRun.status == RunStatus.SUBMITTING,
+            ApplicationRun.confirmed_at < _now() - SUBMITTING_STALE_AFTER,
+        )
+        .options(selectinload(ApplicationRun.events))
+    )
+    for run in stale:
+        _interrupted(run)
+
+
+def _interrupted(run: ApplicationRun) -> None:
+    run.status, run.stop_reason = RunStatus.FAILED, MAYBE_SENT
+    _event(run, AuditActor.SYSTEM, "interrupted", MAYBE_SENT)
 
 
 def _clean(inputs: dict[str, str]) -> dict[str, str]:
@@ -353,12 +389,20 @@ async def submit(
     review_hash: str,
     confirm: bool,
     settings: Settings,
+    embedder: EmbeddingProvider,
+    llm: LLMProvider | None,
 ) -> RunOut:
     if not confirm:
         raise FieldValidationError(
             "confirm", "Confirm that you want to submit exactly what the review shows."
         )
     run = await _owned_run(session, user, run_id)
+    if run.status != RunStatus.AWAITING_REVIEW or run.review_hash is None:
+        raise ConflictError("This assisted application isn't waiting for your review.")
+    a = await applications._owned(session, user, run.application_id)
+    # Verified against the evidence as it is now (commits a new report); then locked.
+    await approval.reverify_documents(session, user, a, embedder, llm, settings)
+    await approval.lock(session, a)
     await session.refresh(run, with_for_update=True)  # one submission at a time
     if run.status != RunStatus.AWAITING_REVIEW or run.review_hash is None:
         raise ConflictError("This assisted application isn't waiting for your review.")
@@ -366,7 +410,6 @@ async def submit(
         raise ConflictError(
             "The review changed since you looked at it. Review it again before submitting."
         )
-    a = await applications._owned(session, user, run.application_id)
     await _check_application(session, user, a)
     # Approved, unchanged since approval, nothing missing or unverified (409, audited).
     await approval.ensure_can_submit(session, user, a)
@@ -384,9 +427,18 @@ async def submit(
     )
     await session.commit()
 
-    outcome = await runner.submit(
-        run.destination_url, adapter, materials, dict(run.inputs), review_hash, settings
-    )
+    try:
+        outcome = await runner.submit(
+            run.destination_url, adapter, materials, dict(run.inputs), review_hash, settings
+        )
+    except Exception:
+        # The form may already be on its way: never report "not submitted" or allow a quiet
+        # retry. (A crash that skips this is settled by the next start after a timeout.)
+        logger.exception("Assisted submission %s was interrupted", run_id)
+        run = await _owned_run(session, user, run_id)
+        _interrupted(run)
+        await session.commit()
+        return await _reload(session, user, run_id)
     run = await _owned_run(session, user, run_id)
     _record(run, outcome)
     if outcome.confirmation_reference is not None:

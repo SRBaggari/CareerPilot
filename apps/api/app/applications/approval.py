@@ -21,6 +21,8 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.embeddings import EmbeddingProvider
+from app.ai.provider import LLMProvider
 from app.applications.models import (
     Application,
     ApplicationApproval,
@@ -30,8 +32,11 @@ from app.applications.models import (
     ApprovalState,
     StatusActor,
 )
+from app.automation.models import ApplicationRun, RunStatus
+from app.core.config import Settings
 from app.core.errors import ConflictError
 from app.documents.answers.service import _sentences
+from app.documents.cover_letter import service as letters
 from app.documents.models import (
     ApplicationAnswer,
     ClaimStatus,
@@ -40,6 +45,7 @@ from app.documents.models import (
     GeneratedClaim,
     TailoredResume,
 )
+from app.documents.resume import service as resumes
 from app.profiles.models import CandidateProfile
 from app.users.models import User
 from app.verification import service as verification
@@ -574,6 +580,56 @@ async def invalidate_if_changed(
         current_hash=current,
     )
     return changed
+
+
+_DECISION_FIELDS = [
+    "status",
+    "approval_state",
+    "approved_at",
+    "approved_by_id",
+    "approved_content_hash",
+    "submitted_at",
+]
+
+
+async def lock(session: AsyncSession, a: Application) -> None:
+    """Serialize decisions about one application (approve, reject, status changes, assisted
+    starts and submissions) with a row lock held until the transaction commits."""
+    await session.execute(select(Application.id).where(Application.id == a.id).with_for_update())
+    # Decide on the state as of the lock, not as first read (relationships stay loaded).
+    await session.refresh(a, _DECISION_FIELDS)
+
+
+async def ensure_not_submitting(session: AsyncSession, a: Application) -> None:
+    """Refuse (409) while browser assistance is submitting this application: the outcome,
+    and the approval it relies on, must be recorded before anything else changes."""
+    submitting = await session.scalar(
+        select(func.count())
+        .select_from(ApplicationRun)
+        .where(ApplicationRun.application_id == a.id, ApplicationRun.status == RunStatus.SUBMITTING)
+    )
+    if submitting:
+        raise ConflictError(
+            "CareerPilot is submitting this application right now. Wait for it to finish."
+        )
+
+
+async def reverify_documents(
+    session: AsyncSession,
+    user: User,
+    a: Application,
+    embedder: EmbeddingProvider,
+    llm: LLMProvider | None,
+    settings: Settings,
+) -> None:
+    """Verify the resume and cover letter again against the candidate's current evidence,
+    so approval and submission never rely on a report from before the evidence changed
+    (answers are re-verified by their own approval). A claim that no longer passes is
+    recorded in a new report, which the review then shows as a blocker; nothing is fixed."""
+    if a.tailored_resume is not None:
+        await resumes.reverify(session, user, a.tailored_resume.id, embedder, llm, settings)
+    if a.cover_letter is not None:
+        await letters.reverify(session, user, a.cover_letter.id, embedder, llm, settings)
 
 
 async def ensure_can_submit(

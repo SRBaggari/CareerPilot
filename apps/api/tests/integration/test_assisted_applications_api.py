@@ -374,3 +374,97 @@ async def test_a_page_cannot_send_the_filled_form_to_another_site(
     assert mock_site.BEACONS == []  # the filled email never left the page
     assert "blocked_external" in actions(run)
     assert all("?" not in str(e["detail"].get("url", "")) for e in run["events"])
+
+
+# --- Production-readiness review: submissions in flight -------------------------------------
+
+
+async def test_nothing_changes_the_application_while_it_is_being_submitted(
+    api: httpx2.AsyncClient, db: AsyncSession, site: str
+) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import update
+
+    from app.automation.models import ApplicationRun
+
+    app = await approved_application(api, f"{site}/jobs/northwind-ml/apply", letter=False)
+    run = await start(api, app["id"], work_authorization="Yes")
+    assert run["status"] == "awaiting_review", run["stop_reason"]
+    # Another request confirmed it and the browser is submitting it right now.
+    await db.execute(
+        update(ApplicationRun).values(status="submitting", confirmed_at=datetime.now(UTC))
+    )
+    for response in (
+        await api.post(f"{APPS}/{app['id']}/reject", json={"note": "changed my mind"}),
+        await move(api, app["id"], "withdrawn"),
+        await api.post(f"{APPS}/{app['id']}/assisted-runs", json={"inputs": {}}),
+    ):
+        assert response.status_code == 409 and "submitting this application" in response.text
+    assert (await ok(await api.get(f"{APPS}/{app['id']}")))["approval_state"] == "approved"
+
+    # A submission interrupted long ago (a crash mid-submit) is settled as "may have been
+    # sent" rather than "not submitted", and no longer blocks the application.
+    await db.execute(
+        update(ApplicationRun).values(confirmed_at=datetime.now(UTC) - timedelta(minutes=11))
+    )
+    again = await start(api, app["id"], work_authorization="Yes")
+    old = await ok(await api.get(f"{RUNS}/{run['id']}"))
+    assert old["status"] == "failed" and "may have been sent" not in old["stop_reason"]
+    assert "can't tell whether the employer received it" in old["stop_reason"]
+    assert actions(old)[-1] == "interrupted" and again["status"] == "awaiting_review"
+
+
+async def test_an_error_during_submission_is_never_reported_as_not_submitted(
+    api: httpx2.AsyncClient, site: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.automation import runner
+
+    app = await approved_application(api, f"{site}/jobs/northwind-ml/apply", letter=False)
+    run = await start(api, app["id"], work_authorization="Yes")
+
+    async def crash(*_: object, **__: object) -> None:
+        raise RuntimeError("browser crashed after clicking submit")
+
+    monkeypatch.setattr(runner, "submit", crash)
+    result = await ok(
+        await api.post(
+            f"{RUNS}/{run['id']}/submit", json={"review_hash": run["review_hash"], "confirm": True}
+        )
+    )
+    assert result["status"] == "failed" and "can't tell" in result["stop_reason"]
+    assert "browser crashed" not in str(result)  # details stay in the server log
+
+
+async def test_approval_verifies_the_documents_against_the_current_evidence(
+    api: httpx2.AsyncClient,
+) -> None:
+    ids = await build_profile(api)
+    job_id = await build_job(api)
+    resume = await post(api, f"{JOBS}/{job_id}/tailored-resumes")
+    assert "Machine Learning Intern" in str(resume["content"])
+    app = await track(api, job_id)
+    await ok(await move(api, app["id"], "application_prepared"))
+    await api.post(f"{APPS}/{app['id']}/review/request")
+    review = (await api.get(f"{APPS}/{app['id']}/review")).json()
+    assert review["can_approve"], review["issues"]
+    # The profile changes after generation; the resume's text (and the review's content
+    # hash) don't, but its job title no longer matches the candidate's record.
+    work = ids["records"]["work_experience"]
+    await ok(
+        await api.put(
+            f"/api/v1/profile/work-experiences/{work}",
+            json={
+                "title": "Data Analyst Intern",
+                "company_name": "Acme Analytics",
+                "start_date": "2023-05-01",
+                "end_date": "2024-05-01",
+            },
+        )
+    )
+    refused = await api.post(
+        f"{APPS}/{app['id']}/approve",
+        json={"content_hash": review["content_hash"], "confirm": True},
+    )
+    assert refused.status_code == 409 and "Not ready to approve" in refused.text
+    assert (await ok(await api.get(f"{APPS}/{app['id']}")))["approval_state"] == "ready_for_review"

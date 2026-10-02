@@ -129,8 +129,8 @@ HALLUCINATIONS = [
     ("Deployed ML models with Docker on AWS and monitored drift.", P, "drift"),
     # Unrelated content dressed in the evidence's wording.
     ("Designed a fraud detection system for payment transactions.", U, "fraud"),
-    ("Won first place at a national hackathon.", U, "hackathon"),
-    ("Published research on quantum error correction.", U, "quantum"),
+    ("Won first place at a national hackathon.", U, "won"),
+    ("Published research on quantum error correction.", U, "published"),
 ]  # fmt: skip
 
 
@@ -177,3 +177,45 @@ def test_a_metric_named_after_its_number_is_matched_to_the_same_metric() -> None
     assert same.verdict == S, same.reason
     borrowed = check("I reduced inference latency by 92%.", cnn)
     assert borrowed.verdict != S, borrowed.reason
+
+
+# --- Production-readiness review regressions ---------------------------------------------
+
+DASHBOARD = EvidenceText("Built a dashboard for students using React.", "Capstone")
+PROTOTYPE = EvidenceText("Prototype chatbot; not deployed to production.", "Side project")
+
+
+@pytest.mark.parametrize(
+    ("text", "reason"),
+    [
+        ("Built a dashboard used by fifty students using React.", "50"),
+        ("Built a dashboard for a dozen students using React.", "12"),
+        ("Built a dashboard for seventeen students using React.", "17"),
+        ("Built a dashboard for students using React that won an award.", "won"),
+        ("Single-handedly built a dashboard for students using React.", "single-handedly"),
+        ("Built a dashboard for students using React, adopted by the department.", "adopted"),
+    ],
+)
+def test_number_words_and_outcomes_are_facts_of_their_own(text: str, reason: str) -> None:
+    result = check(text, DASHBOARD)
+    assert result.verdict == U and result.veto and reason in result.reason
+
+
+def test_evidence_that_denies_a_claim_contradicts_it() -> None:
+    result = check("Deployed the chatbot to production.", PROTOTYPE)
+    assert result.verdict == C and result.veto and "did not happen" in result.reason
+    # A claim that keeps the negation is faithful, and other evidence can affirm it.
+    assert check("Built a prototype chatbot that was not deployed.", PROTOTYPE).verdict != C
+    shipped = EvidenceText("Deployed chatbot v2 to production.", "Side project")
+    assert check("Deployed the chatbot to production.", PROTOTYPE, shipped).verdict == S
+
+
+def test_short_skill_names_are_not_matched_as_ordinary_words() -> None:
+    go_live = EvidenceText("Helped the team go live with the new checkout.", "Shop")
+    assert check("Go", go_live, kind=ClaimKind.SKILL).verdict == U
+    assert check("R", EvidenceText("Reviewed PRs. R scripts were rare.", ""),
+                 kind=ClaimKind.SKILL).verdict == U  # fmt: skip
+    go_used = EvidenceText("Wrote payment services in Go and Python.", "Shop")
+    assert check("Go", go_used, kind=ClaimKind.SKILL).verdict == S
+    assert check("Go", EvidenceText("Built Golang microservices.", ""),
+                 kind=ClaimKind.SKILL).verdict == S  # fmt: skip

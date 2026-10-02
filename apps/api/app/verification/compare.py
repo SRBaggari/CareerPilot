@@ -70,7 +70,23 @@ _NUMBER_WORDS = {
     "ten": "10",
     "eleven": "11",
     "twelve": "12",
+    "thirteen": "13",
+    "fourteen": "14",
+    "fifteen": "15",
+    "sixteen": "16",
+    "seventeen": "17",
+    "eighteen": "18",
+    "nineteen": "19",
     "twenty": "20",
+    "thirty": "30",
+    "forty": "40",
+    "fifty": "50",
+    "sixty": "60",
+    "seventy": "70",
+    "eighty": "80",
+    "ninety": "90",
+    "dozen": "12",
+    "score": "20",
     "hundred": "100",
     "thousand": "1000",
     "million": "1000000",
@@ -80,6 +96,29 @@ _VAGUE_QUANTITIES = re.compile(
     r"\b(dozens|hundreds|thousands|millions|billions|several|numerous|multiple|countless)\b",
     re.IGNORECASE,
 )
+# Outcomes, recognition and sole ownership: each is a fact of its own that the evidence must
+# state, however much of the rest of the sentence it covers ("my team won ...").
+_OUTCOMES = frozenset(
+    {"won", "win", "wins", "winner", "winning", "award", "awarded", "awards", "prize",
+     "champion", "championship", "finalist", "medal", "ranked", "rank", "top-ranked",
+     "alone", "single-handedly", "singlehandedly", "solely", "solo", "sole", "adopted",
+     "published", "patent", "patented", "recognized", "recognised", "promoted", "acquired",
+     "funded", "revenue", "profit", "profitable", "customers", "users", "certified",
+     "accepted", "featured", "selected", "shortlisted", "hired", "nominated"}
+)  # fmt: skip
+# Words that deny the statement they belong to ("not deployed to production").
+_NEGATIONS = frozenset(
+    {"not", "never", "no", "without", "didn't", "wasn't", "weren't", "isn't", "aren't",
+     "hasn't", "haven't", "won't", "cannot", "can't", "couldn't", "nor", "neither"}
+)  # fmt: skip
+# Single words that deny an action, mapped to the stem of the action they deny.
+_DENYING_WORDS = {
+    "unreleased": "releas",
+    "undeployed": "deploy",
+    "unshipped": "shipp",
+    "unpublished": "publish",
+    "unlaunched": "launch",
+}
 _QUALIFIERS = re.compile(
     r"\b(production|production-grade|production-ready|scalable|enterprise|enterprise-grade|"
     r"large-scale|high-traffic|high-performance|mission-critical|world-class|cutting-edge|"
@@ -276,6 +315,24 @@ _SIGN_OFF_WORDS = frozenset(
     {"dear", "sincerely", "best", "kind", "regards", "yours", "faithfully", "truly", "and",
      "of", "at", "for"}
 )  # fmt: skip
+# Every word a sentence may use and still claim nothing about the candidate (besides the
+# job title, the company and salutation words). Deliberately small: a sentence with any
+# other word is treated as a factual claim.
+_COURTESY_WORDS = frozenset(
+    {"i", "i'm", "i'd", "am", "me", "my", "you", "your", "we", "us", "our", "it", "this",
+     "that", "a", "an", "the", "to", "for", "of", "at", "with", "in", "on", "about", "from",
+     "and", "or", "as", "be", "is", "would", "will", "could", "welcome", "like", "love",
+     "appreciate", "appreciated", "writing", "write", "apply", "applying", "application",
+     "position", "role", "opening", "opportunity", "chance", "excited", "eager",
+     "interested", "pleased", "happy", "glad", "delighted", "thank", "thanks", "time",
+     "consideration", "considering", "discuss", "discussing", "speak", "talk", "meet",
+     "conversation", "interview", "look", "looking", "forward", "hearing", "hear",
+     "hope", "please", "further", "more", "learn", "soon", "attached", "enclosed",
+     "find", "resume", "cover", "letter", "review", "reviewing", "dear", "sincerely",
+     "regards", "best", "kind", "warm", "warmly", "respectfully", "yours", "faithfully",
+     "truly", "very", "much", "again", "convenience", "earliest", "next", "steps",
+     "join", "joining", "contact", "reach", "available", "availability"}
+)  # fmt: skip
 # Wording that turns a sentence into a statement about the candidate's past or abilities.
 _FACT_WORDING = re.compile(
     r"\b(?:i|i've|we)\s+(?:have|had|'ve|built|led|developed|created|designed|managed|"
@@ -406,6 +463,67 @@ def _coverage(claim_stems: set[str], support_stems: set[str]) -> float:
     return len(claim_stems & support_stems) / len(claim_stems) if claim_stems else 0.0
 
 
+_NEGATION_SCOPE = 3  # words after a negation that it denies
+
+
+def _negates(word: str) -> bool:
+    return word in _NEGATIONS or word.endswith("n't")
+
+
+def _denied(text: str, evidence: list[EvidenceText]) -> str | None:
+    """The first thing the claim asserts that the evidence explicitly denies, if any.
+
+    "Prototype chatbot; not deployed to production." denies "deploy", so the claim
+    "Deployed the chatbot to production." contradicts it, unless the claim is itself
+    negative or another evidence statement affirms the same thing.
+    """
+    claim_words = words(text)
+    if any(_negates(w) for w in claim_words):
+        return None
+    claim_stems = {_stem(w) for w in claim_words}
+    denied: list[str] = []
+    affirmed: set[str] = set()
+    for item in evidence:
+        for statement in re.split(r"[.;:!?\n]+", f"{item.context}\n{item.content}"):
+            tokens = words(statement)
+            scoped: set[int] = set()
+            for i, token in enumerate(tokens):
+                if token in _DENYING_WORDS:
+                    denied.append(_DENYING_WORDS[token])
+                    scoped.add(i)
+                elif _negates(token):
+                    # The first content word after the negation is what it denies.
+                    after = [
+                        j
+                        for j in range(i + 1, min(len(tokens), i + 1 + _NEGATION_SCOPE))
+                        if len(tokens[j]) >= 3 and tokens[j] not in _STOPWORDS
+                    ]
+                    if after:
+                        scoped.add(after[0])
+                        denied.append(_stem(tokens[after[0]]))
+            affirmed |= {_stem(t) for j, t in enumerate(tokens) if j not in scoped}
+    for stem in denied:
+        if stem in claim_stems and stem not in affirmed:
+            return stem
+    return None
+
+
+def _names_skill(skill: str, support: str) -> bool:
+    """Whether ``support`` names ``skill`` as a word. A known technology must be found as
+    one (by the caller). Short names ("Go", "R", "C") are also ordinary words, so they must
+    match with the same capitalization and not just start a sentence ("go live" isn't Go)."""
+    if find_technologies(skill) == [skill]:
+        return False
+    if len(skill) > 3:
+        pattern = rf"(?<![\w]){re.escape(skill)}(?![\w])"
+        return re.search(pattern, support, re.IGNORECASE) is not None
+    for m in re.finditer(rf"(?<![\w]){re.escape(skill)}(?![\w+#])", support):
+        before = support[: m.start()].rstrip(" \t")
+        if before and before[-1] not in ".!?:;\n":
+            return True
+    return False
+
+
 def compare(text: str, evidence: list[EvidenceText], kind: ClaimKind) -> Comparison:
     if not evidence:
         return Comparison(V.UNSUPPORTED, "No verified evidence supports this claim.", 0.0, True)
@@ -413,9 +531,7 @@ def compare(text: str, evidence: list[EvidenceText], kind: ClaimKind) -> Compari
     support_lower = support.lower()
 
     if kind == ClaimKind.SKILL:
-        named = text in find_technologies(support) or re.search(
-            rf"(?<![\w]){re.escape(text.lower())}(?![\w])", support_lower
-        )
+        named = text in find_technologies(support) or _names_skill(text, support)
         if named:
             return Comparison(V.SUPPORTED, f"The evidence names {text}.", 1.0)
         return Comparison(V.UNSUPPORTED, f"The evidence doesn't mention {text}.", 0.0, True)
@@ -439,6 +555,25 @@ def compare(text: str, evidence: list[EvidenceText], kind: ClaimKind) -> Compari
         return Comparison(V.UNSUPPORTED, f"Adds a scale not in the evidence: {listed}.", 0.0, True)
 
     support_words = set(words(support))
+    hyphenated = re.compile(r"[a-z][a-z0-9+#'-]*")  # keeps "single-handedly" whole
+    support_word_stems = {_stem(w) for w in support_words | set(hyphenated.findall(support_lower))}
+    outcomes = sorted(
+        {
+            w
+            for w in hyphenated.findall(text.lower()) + words(text)
+            if w in _OUTCOMES and _stem(w) not in support_word_stems
+        }
+    )
+    if outcomes:
+        listed = ", ".join(outcomes)
+        return Comparison(
+            V.UNSUPPORTED, f"Claims an outcome the evidence doesn't state: {listed}.", 0.0, True
+        )
+    if denied := _denied(text, evidence):
+        return Comparison(
+            V.CONTRADICTED, f"The evidence says this did not happen: {denied}.", 0.0, True
+        )
+
     escalated = {w for w in words(text) if w in _ESCALATION}
     support_roles = {_ESCALATION[w] for w in support_words if w in _ESCALATION}
     overstated = sorted(w for w in escalated if _ESCALATION[w] not in support_roles)
@@ -527,4 +662,10 @@ def is_non_factual(text: str, allowed_names: set[str]) -> bool:
         for n in _proper_nouns(text)
         if n != "I" and n.lower().removesuffix("'s").removesuffix("'") not in allowed_words
     }
-    return not names
+    if names:
+        return False
+    # Allow-list, not block-list: every word must be courtesy or intent vocabulary, or part
+    # of the job title and company. Anything else ("I'd bring ...", "who has shipped ...",
+    # "my team won ...") is a claim about the candidate and needs evidence.
+    possessive = {w.removesuffix("'s") for w in words(text)}
+    return not (possessive - allowed_words - _SIGN_OFF_WORDS - _COURTESY_WORDS)

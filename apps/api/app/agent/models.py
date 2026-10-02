@@ -23,6 +23,7 @@ from app.db.base import (
 
 class RunStatus(StrEnum):
     READY = "ready"  # can advance
+    RUNNING = "running"  # a request is advancing it; others are refused
     WAITING_FOR_HUMAN = "waiting_for_human"  # paused: see ``pause``
     COMPLETED = "completed"
     FAILED = "failed"  # an unexpected error; advancing retries the stage

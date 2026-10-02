@@ -40,7 +40,11 @@ A sentence counts as non-factual only if all of these hold:
   "strong communication skills");
 - it contains no qualifiers, scale or role words, except those in the job's own title;
 - it says nothing about the candidate's past or abilities ("I have…", "my experience…");
-- it names nothing other than the company and job title.
+- it names nothing other than the company and job title;
+- every word is courtesy or intent vocabulary ("I would welcome the opportunity to
+  discuss…", "Thank you for your time"), the job title or the company. This is an
+  allow-list, so "I'd bring hands-on experience…", "a candidate who has shipped…" and
+  "my team won…" are factual claims.
 
 A salutation or sign-off may contain only those names and standard salutation words.
 Anything else is a factual claim and needs evidence.

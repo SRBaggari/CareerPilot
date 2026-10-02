@@ -101,6 +101,7 @@ def test_dashboard_and_jobs(page: Page, seeded: dict[str, Any]) -> None:
     expect(summary.get_by_role("link", name=re.compile(r"Saved jobs\s*1"))).to_be_visible()
 
     page.get_by_role("navigation", name="Main").get_by_role("link", name="Jobs", exact=True).click()
+    expect(page).to_have_url(re.compile(r"/jobs$"))  # the dashboard links to jobs too
     for job in data.JOBS.values():
         expect(page.get_by_role("link", name=re.compile(job["title"]))).to_be_visible()
     page.get_by_role("link", name=re.compile("AI Engineer Intern")).click()

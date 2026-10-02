@@ -12,6 +12,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.embeddings import EmbeddingProvider
+from app.ai.provider import LLMProvider
+from app.api.routes.candidate_evidence import get_embedder
+from app.api.routes.verification import get_verification_llm
 from app.automation import service
 from app.automation.schemas import RunConfirm, RunInputs, RunOut, RunStart
 from app.core.config import Settings, get_settings
@@ -68,10 +72,13 @@ async def submit_run(
     session: Session,
     user: CurrentUser,
     settings: AppSettings,
+    embedder: EmbeddingProvider = Depends(get_embedder),
+    llm: LLMProvider | None = Depends(get_verification_llm),
 ) -> RunOut:
-    """Submit, only with your explicit confirmation of the exact review you saw."""
+    """Submit, only with your explicit confirmation of the exact review you saw. The resume
+    and cover letter are verified again against your current evidence first."""
     return await service.submit(
-        session, user, run_id, payload.review_hash, payload.confirm, settings
+        session, user, run_id, payload.review_hash, payload.confirm, settings, embedder, llm
     )
 
 

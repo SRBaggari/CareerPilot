@@ -14,6 +14,8 @@ COPY package.json package-lock.json ./
 COPY apps/web/package.json apps/web/package.json
 RUN npm ci --workspace web --include-workspace-root
 COPY apps/web apps/web
+# public/ may hold nothing but .gitkeep; make sure it exists for the final COPY.
+RUN mkdir -p apps/web/public
 ARG NEXT_PUBLIC_API_BASE_URL
 RUN test -n "$NEXT_PUBLIC_API_BASE_URL" || (echo "Set --build-arg NEXT_PUBLIC_API_BASE_URL" && exit 1)
 ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \

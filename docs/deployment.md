@@ -127,12 +127,12 @@ back, restore the backup taken before the update and redeploy the previous versi
 docker compose --env-file .env -f deploy/docker-compose.yml exec -T db \
   pg_dump -U careerpilot -d careerpilot -Fc > careerpilot-$(date +%F).dump
 # Uploaded resumes
-docker run --rm -v careerpilot_storage:/data -v "$PWD":/backup alpine \
+docker run --rm -v careerpilot-prod_storage:/data -v "$PWD":/backup alpine \
   tar czf /backup/storage-$(date +%F).tgz -C /data .
 ```
 
 Restore into a stopped stack: `pg_restore --clean --if-exists -d careerpilot` (inside the
-`db` container), and extract the storage archive into the `careerpilot_storage` volume.
+`db` container), and extract the storage archive into the `careerpilot-prod_storage` volume.
 Keep backups encrypted: they contain personal data.
 
 ## Configuration reference
@@ -257,7 +257,8 @@ The web image has its own `HEALTHCHECK` on `/`.
 
 - Generation and verification run while you wait (seconds).
 - Browser-assisted applications run a headless browser inside the request (up to about a
-  minute). Caddy's API timeout is 180 seconds for this.
+  minute). Caddy's API timeout is 300 seconds; each model call times out after
+  `LLM_TIMEOUT_SECONDS` and is retried `LLM_MAX_RETRIES` times.
 - Follow-up reminders are computed when the dashboard is read; nothing is sent, ever.
 - Job recommendations refresh when you ask.
 

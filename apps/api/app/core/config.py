@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     llm_provider: str = "anthropic"
     llm_model: str = "claude-opus-5-5"
     anthropic_api_key: SecretStr | None = None
+    # Each model call gives up after this long (then retries up to LLM_MAX_RETRIES times), so
+    # a slow provider fails a request well inside the reverse proxy's timeout.
+    llm_timeout_seconds: float = Field(default=120.0, gt=0, le=600)
+    llm_max_retries: int = Field(default=1, ge=0, le=5)
     # Embeddings for evidence retrieval. "hash" is a deterministic, offline, *lexical*
     # embedder (tests and keyless development); use "voyage" for real semantic search.
     embedding_provider: Literal["hash", "voyage"] = "hash"

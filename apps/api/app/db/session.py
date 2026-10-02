@@ -40,6 +40,7 @@ def _init() -> tuple[AsyncEngine, async_sessionmaker[AsyncSession]]:
         _engine = create_async_engine(
             settings.database_url.get_secret_value(),
             echo=settings.database_echo,
+            hide_parameters=True,  # bound values (personal data) never reach error logs
             pool_pre_ping=True,
         )
         _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False)

@@ -5,7 +5,8 @@
 #
 # Only Caddy publishes ports (80, 443). The database and API are reachable only on the
 # internal network.
-name: careerpilot
+# Its own project name, so it never shares volumes with the development stack (infra/).
+name: careerpilot-prod
 
 x-api-environment: &api-environment
   APP_ENV: production
@@ -68,6 +69,8 @@ services:
   api:
     image: careerpilot-api
     restart: unless-stopped
+    # Let in-flight requests (a submission in a headless browser) finish on shutdown.
+    stop_grace_period: 90s
     environment: *api-environment
     volumes:
       - storage:/data/storage

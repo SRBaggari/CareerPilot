@@ -84,6 +84,12 @@ browser starts). Submission is refused (409, audited as `submission_blocked`) if
 | Required fields are missing | any blocker: no resume, no name, application not prepared |
 | Claims are unverified | any document or answer not fully verified: its status, its latest verification report, or any stored claim not verified |
 
+Approving, and browser-assisted submission, first **verify the resume and cover letter
+again** against the candidate's current evidence and profile (a new verification report is
+stored). A claim the profile no longer backs, such as an old job title or phone number,
+blocks the action until the document is regenerated or fixed. Decisions about one
+application are serialized with a row lock.
+
 When the content changed, the approval is **withdrawn automatically** (back to
 `ready_for_review`, `approval_invalidated` audited with which sections changed). This also
 happens when the review is opened, when browser assistance starts, and immediately when the

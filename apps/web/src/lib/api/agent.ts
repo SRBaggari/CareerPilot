@@ -12,7 +12,8 @@ export type Stage =
   | "track"
   | "done";
 
-export type RunStatus = "ready" | "waiting_for_human" | "completed" | "failed" | "cancelled";
+export type RunStatus =
+  "ready" | "running" | "waiting_for_human" | "completed" | "failed" | "cancelled";
 
 export type PauseKind =
   | "missing_information"
@@ -36,6 +37,7 @@ export const STAGE_LABELS: Record<Stage, string> = {
 
 export const STATUS_LABELS: Record<RunStatus, string> = {
   ready: "Ready to continue",
+  running: "Working…",
   waiting_for_human: "Waiting for you",
   completed: "Completed",
   failed: "Failed",

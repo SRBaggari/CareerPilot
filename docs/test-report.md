@@ -1,6 +1,6 @@
 # CareerPilot end-to-end test report
 
-**Date:** 2026-10-01 · **Scope:** the whole product, from candidate creation to a tracked
+**Date:** 2026-10-02 (re-run after the production-readiness review) · **Scope:** the whole product, from candidate creation to a tracked
 application, plus hallucination scenarios · **Result:** all checks pass, after the
 fixes listed below.
 
@@ -8,8 +8,8 @@ fixes listed below.
 
 | Check | Command | Result |
 | --- | --- | --- |
-| Backend unit tests | `uv run pytest` (without a database) | **481 passed** |
-| Backend integration tests (incl. API end-to-end) | `TEST_DATABASE_URL=… uv run pytest -W error` | **329 passed** (810 in the full run, warnings treated as errors) |
+| Backend unit tests | `uv run pytest` (without a database) | **516 passed** |
+| Backend integration tests (incl. API end-to-end) | `TEST_DATABASE_URL=… uv run pytest -W error` | **339 passed** (855 in the full run, warnings treated as errors) |
 | Browser end-to-end tests | `npm run test:e2e` | **4 passed** (production web build, API, mock site, Chromium) |
 | Frontend tests | `npm test --workspace web` (Vitest) | **121 passed** (23 files) |
 | Type checking | `mypy --strict` (193 files), `tsc --noEmit` | **No errors** |

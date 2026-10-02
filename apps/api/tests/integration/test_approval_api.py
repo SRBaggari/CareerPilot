@@ -185,6 +185,10 @@ async def test_missing_and_unverified_content_blocks_approval(
     assert not resume["verified"] and resume["unverified"]
     assert any(i["section"] == "resume" and i["severity"] == "blocker" for i in package["issues"])
     assert not package["can_approve"]
+    # Approval verifies the resume again, against the profile as it is now: a stale "not
+    # verified" is corrected, and content the profile no longer backs is refused.
+    await ok(await api.patch(PROFILE, json={"full_name": "Someone Renamed"}))
+    package = await review(api, app["id"])
     blocked = await approve_with(api, app["id"], content_hash=package["content_hash"], confirm=True)
     assert blocked.status_code == 409 and "aren't verified" in blocked.text
     assert "approval_blocked" in actions(await review(api, app["id"]))
@@ -226,6 +230,16 @@ async def test_changes_after_approval_withdraw_it_and_block_submission(
     [invalidated] = [e for e in package["events"] if e["action"] == "approval_invalidated"]
     assert invalidated["actor"] == "system" and invalidated["detail"]["changed"] == ["personal"]
     assert package["personal"]["phone"] == "+91 90000 00000"  # the review shows the change
+
+    # The resume and letter still carry the old contact details, which approval's fresh
+    # verification catches; regenerated, the new version can be approved.
+    stale = await approve_with(api, app["id"], content_hash=package["content_hash"], confirm=True)
+    assert stale.status_code == 409 and "aren't verified" in stale.text
+    resume = await post(api, f"{JOBS}/{app['job_id']}/tailored-resumes")
+    letter = await post(api, f"{JOBS}/{app['job_id']}/cover-letters")
+    attach = {"tailored_resume_id": resume["id"], "cover_letter_id": letter["id"]}
+    await ok(await api.patch(f"{APPS}/{app['id']}", json=attach))
+    package = await review(api, app["id"])
 
     # Approving the new version allows submission; the history keeps both versions.
     approved = await ok(

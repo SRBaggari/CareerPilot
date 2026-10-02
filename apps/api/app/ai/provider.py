@@ -1,6 +1,7 @@
 """LLM provider abstraction. Domain code depends on ``LLMProvider``, never on a vendor SDK,
 so providers can be added or swapped without touching business logic."""
 
+import functools
 import json
 import time
 from dataclasses import dataclass
@@ -40,9 +41,11 @@ class LLMProvider(Protocol):
 class AnthropicProvider:
     name = "anthropic"
 
-    def __init__(self, api_key: str, model: str) -> None:
+    def __init__(
+        self, api_key: str, model: str, *, timeout: float = 120.0, max_retries: int = 1
+    ) -> None:
         self.model = model
-        self._client = anthropic.AsyncAnthropic(api_key=api_key)
+        self._client = _client(api_key, timeout, max_retries)
 
     async def complete_json(
         self, *, system: str, prompt: str, schema: dict[str, Any], max_tokens: int = 16000
@@ -96,10 +99,21 @@ class AnthropicProvider:
         )
 
 
+@functools.lru_cache(maxsize=4)
+def _client(api_key: str, timeout: float, max_retries: int) -> anthropic.AsyncAnthropic:
+    """One client (and connection pool) per process and configuration, not per request."""
+    return anthropic.AsyncAnthropic(api_key=api_key, timeout=timeout, max_retries=max_retries)
+
+
 def get_llm_provider(settings: Settings) -> LLMProvider | None:
     """The configured provider, or None when no credentials are configured."""
     if settings.llm_provider == "anthropic" and settings.anthropic_api_key is not None:
         key = settings.anthropic_api_key.get_secret_value()
         if key:
-            return AnthropicProvider(api_key=key, model=settings.llm_model)
+            return AnthropicProvider(
+                api_key=key,
+                model=settings.llm_model,
+                timeout=settings.llm_timeout_seconds,
+                max_retries=settings.llm_max_retries,
+            )
     return None

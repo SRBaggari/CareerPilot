@@ -113,7 +113,7 @@ Runs are private: another user gets 404, and a run can't use someone else's job.
 
 | Table | Notes |
 | --- | --- |
-| `agent_runs` | `stage`, `status` (ready, waiting_for_human, completed, failed, cancelled), `goal`, `inputs` (the candidate's decisions), `pause`, `steps`, `last_error`, `job_id`, `application_id`. CHECKs: waiting ⇔ a pause is recorded; `done` ⇔ completed; steps ≥ 0 |
+| `agent_runs` | `stage`, `status` (ready, running, waiting_for_human, completed, failed, cancelled; `running` is claimed under a row lock so only one request advances a run, and expires after 15 minutes if that request died), `goal`, `inputs` (the candidate's decisions), `pause`, `steps`, `last_error`, `job_id`, `application_id`. CHECKs: waiting ⇔ a pause is recorded; `done` ⇔ completed; steps ≥ 0 |
 | `agent_action_logs` | The execution log above; indexed by (`run_id`, `created_at`) |
 
 ## Tests

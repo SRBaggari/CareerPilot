@@ -11,6 +11,8 @@ import uuid
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.embeddings import EmbeddingProvider
+from app.ai.provider import LLMProvider
 from app.applications import approval
 from app.applications import service as applications
 from app.applications.approval import ReviewPackage
@@ -21,6 +23,7 @@ from app.applications.models import (
     ApprovalState,
     StatusActor,
 )
+from app.core.config import Settings
 from app.core.errors import ConflictError, FieldValidationError
 from app.documents.models import DocumentStatus
 from app.users.models import User
@@ -90,19 +93,31 @@ async def request_review(
 
 
 async def approve(
-    session: AsyncSession, user: User, application_id: uuid.UUID, payload: ApprovalIn
+    session: AsyncSession,
+    user: User,
+    application_id: uuid.UUID,
+    payload: ApprovalIn,
+    embedder: EmbeddingProvider,
+    llm: LLMProvider | None,
+    settings: Settings,
 ) -> ReviewPackage:
     if not payload.confirm:
         raise FieldValidationError(
             "confirm", "Confirm that you reviewed the application and approve it."
         )
     a = await applications._owned(session, user, application_id)
-    package, snapshot = await approval.build(session, user, a)
     if a.approval_state != ApprovalState.READY_FOR_REVIEW:
         raise ConflictError(
             "Only an application that's ready for review can be approved"
             + (" (it's already approved)." if a.approval_state == ApprovalState.APPROVED else ".")
         )
+    # Verified against the evidence as it is now, not as it was when the documents were
+    # generated (a deleted or edited record must not stay "verified").
+    await approval.reverify_documents(session, user, a, embedder, llm, settings)
+    await approval.lock(session, a)
+    if a.approval_state != ApprovalState.READY_FOR_REVIEW:
+        raise ConflictError("The application changed while it was being checked. Review it again.")
+    package, snapshot = await approval.build(session, user, a)
     if payload.content_hash != package.content_hash:
         raise ConflictError(
             "The application changed since you opened the review. Review it again before approving."
@@ -153,6 +168,8 @@ async def reject(
     session: AsyncSession, user: User, application_id: uuid.UUID, payload: RejectionIn
 ) -> ReviewPackage:
     a = await applications._owned(session, user, application_id)
+    await approval.lock(session, a)
+    await approval.ensure_not_submitting(session, a)
     if a.approval_state not in (ApprovalState.READY_FOR_REVIEW, ApprovalState.APPROVED):
         raise ConflictError("Only an application under review or approved can be rejected.")
     _, snapshot = await approval.build(session, user, a)

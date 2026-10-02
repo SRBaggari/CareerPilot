@@ -319,12 +319,22 @@ def review(status: VerificationVerdict, *ids: uuid.UUID, reason: str = "Looks ri
 
 
 def test_reviewer_can_accept_a_faithful_paraphrase(kb: CandidateKnowledge) -> None:
-    assessment = assess(claim("Built a RAG-based research assistant.", BARE), kb)
-    assert assessment.result.verification_status == U and not assessment.veto  # wording only
+    text = "Developed a RAG pipeline for searching documents and answering queries."
+    assessment = assess(claim(text, BARE), kb)
+    assert assessment.result.verification_status == P and not assessment.veto  # wording only
     result = apply_review(assessment, review(S, BARE), kb, "fake-model")
     assert result.verification_status == S and result.method == "llm"
     assert result.evidence_ids == [BARE] and result.confidence == 0.75
     assert "AI reviewer (fake-model)" in result.reason and "Rule check" in result.reason
+
+
+def test_reviewer_cannot_upgrade_new_content_that_shares_a_keyword(kb: CandidateKnowledge) -> None:
+    # Only "RAG" is in the evidence; "research assistant" is new. A low-overlap claim stays
+    # unsupported however confident the reviewer is.
+    assessment = assess(claim("Built a RAG-based research assistant.", BARE), kb)
+    assert assessment.result.verification_status == U and not assessment.veto
+    result = apply_review(assessment, review(S, BARE), kb, "fake-model")
+    assert result.verification_status == U and result.method == "rule_based"
 
 
 def test_reviewer_cannot_overrule_a_failed_fact_check(kb: CandidateKnowledge) -> None:

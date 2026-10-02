@@ -70,6 +70,13 @@ def test_greetings_intent_and_courtesy_are_not_factual_claims(text: str) -> None
         "Dear Google Hiring Team,",
         # Technologies are claims about skills.
         "I am eager to use Kubernetes at Northwind Robotics.",
+        # Fabrications that open like courtesy sentences (production-readiness review).
+        "I'd bring hands-on experience building recommendation systems for hospitals.",
+        "I am excited that I interned at a fintech startup last summer.",
+        "I would add that my team won the regional robotics championship.",
+        "Thank you for considering a candidate who has shipped apps to the app store.",
+        "I hope my two years at the lab show my commitment.",
+        "I look forward to applying what I learned during my internship.",
         # Not an intent/courtesy sentence at all.
         "Machine learning is my calling.",
         "Deployed ML models with Docker on AWS.",

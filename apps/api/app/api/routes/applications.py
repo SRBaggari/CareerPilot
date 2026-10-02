@@ -11,6 +11,10 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai.embeddings import EmbeddingProvider
+from app.ai.provider import LLMProvider
+from app.api.routes.candidate_evidence import get_embedder
+from app.api.routes.verification import get_verification_llm
 from app.applications import review, service
 from app.applications.approval import ReviewPackage
 from app.applications.models import ApplicationStatus
@@ -27,6 +31,7 @@ from app.applications.schemas import (
     InterviewUpdate,
     StatusChange,
 )
+from app.core.config import Settings, get_settings
 from app.db.session import get_session
 from app.users.dependencies import get_current_user
 from app.users.models import User
@@ -118,12 +123,19 @@ async def request_review(
 
 @router.post("/{application_id}/approve", response_model=ReviewPackage)
 async def approve_application(
-    application_id: uuid.UUID, payload: ApprovalIn, session: Session, user: CurrentUser
+    application_id: uuid.UUID,
+    payload: ApprovalIn,
+    session: Session,
+    user: CurrentUser,
+    settings: Settings = Depends(get_settings),
+    embedder: EmbeddingProvider = Depends(get_embedder),
+    llm: LLMProvider | None = Depends(get_verification_llm),
 ) -> ReviewPackage:
     """Your explicit approval of the exact content you reviewed (``content_hash`` from the
-    review, ``confirm: true``). Refused if anything is missing or unverified. It submits
+    review, ``confirm: true``). The resume and cover letter are verified again against
+    your current evidence first. Refused if anything is missing or unverified. It submits
     nothing."""
-    return await review.approve(session, user, application_id, payload)
+    return await review.approve(session, user, application_id, payload, embedder, llm, settings)
 
 
 @router.post("/{application_id}/reject", response_model=ReviewPackage)

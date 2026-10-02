@@ -375,3 +375,23 @@ async def test_start_needs_exactly_one_target(api: httpx2.AsyncClient) -> None:
     assert (await api.post(RUNS, json={"job_id": both["job_id"], "x": 1})).status_code == 422
     tools_list = (await api.get("/api/v1/agent/tools")).json()
     assert len({t["agent"] for t in tools_list}) == 10
+
+
+async def test_a_run_is_advanced_by_one_request_at_a_time(
+    api: httpx2.AsyncClient, db: AsyncSession
+) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    await build_profile(api)
+    run = await start(api, job_id=await make_job(api, "Data Engineer", "Bluefin", "Pune"))
+    # Another request claimed the run and is still working on it.
+    await db.execute(update(AgentRun).values(status="running"))
+    busy = await api.post(f"{RUNS}/{run['id']}/advance", json={})
+    assert busy.status_code == 409 and "already working" in busy.json()["detail"]
+    assert (await api.post(f"{RUNS}/{run['id']}/cancel")).status_code == 409
+    assert (await api.get(f"{RUNS}/{run['id']}")).json()["status"] == "running"
+    # A claim left behind by a crashed request expires, and the run can continue.
+    stale = datetime.now(UTC) - timedelta(minutes=16)
+    await db.execute(update(AgentRun).values(updated_at=stale))
+    resumed = await advance(api, run["id"])
+    assert resumed["status"] in ("waiting_for_human", "ready", "completed")

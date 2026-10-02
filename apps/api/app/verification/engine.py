@@ -29,7 +29,13 @@ from app.core.config import Settings
 from app.documents.models import VerificationVerdict
 from app.retrieval.service import retrieve_verified_for_queries
 from app.users.models import User
-from app.verification.compare import ClaimKind, Comparison, compare, is_non_factual
+from app.verification.compare import (
+    PARTIAL_COVERAGE,
+    ClaimKind,
+    Comparison,
+    compare,
+    is_non_factual,
+)
 from app.verification.knowledge import (
     CandidateKnowledge,
     Evidence,
@@ -50,8 +56,9 @@ V = VerificationVerdict
 RETRIEVE_TOP_K = 5
 MAX_RETRIEVED = 3  # retrieved evidence items compared per claim
 LLM_UPGRADE_CONFIDENCE = 0.75
-# The reviewer may only upgrade a claim whose content the cited evidence at least overlaps.
-LLM_MIN_COVERAGE = 0.3
+# The reviewer may only upgrade a claim the cited evidence already partly supports by the
+# rules: it may judge a paraphrase faithful, not supply facts the evidence lacks.
+LLM_MIN_COVERAGE = PARTIAL_COVERAGE
 # How to pick among comparisons against different evidence: support wins; a conflict with
 # stored evidence is reported before a mere lack of support.
 _PICK = {V.SUPPORTED: 3, V.CONTRADICTED: 2, V.PARTIALLY_SUPPORTED: 1, V.UNSUPPORTED: 0}
