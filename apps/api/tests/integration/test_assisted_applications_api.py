@@ -18,6 +18,7 @@ from app.automation import mock_site
 from app.core.config import Settings
 from app.users.models import User
 
+from ..settings_helpers import production_settings, unvalidated
 from .conftest import client_for, make_user
 from .test_applications_api import APPS, approve, move, ok, track
 from .test_evidence_search import SpyEmbedder
@@ -301,7 +302,8 @@ async def test_the_mock_site_is_never_supported_in_production(
 ) -> None:
     from app.automation.adapters import adapter_for
 
-    production = Settings(_env_file=None, app_env="production", automation_mock_site_url=site)
+    # Configuration refuses this in production; the adapter refuses it independently.
+    production = unvalidated(production_settings(), automation_mock_site_url=site)
     assert adapter_for(f"{site}/jobs/x/apply", production) is None
     test = Settings(_env_file=None, app_env="test", automation_mock_site_url=site)
     assert adapter_for(f"{site}/jobs/x/apply", test) is not None

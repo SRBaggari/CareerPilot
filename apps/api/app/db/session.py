@@ -6,6 +6,7 @@ database configured. Call ``dispose_engine()`` on shutdown.
 
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from pathlib import Path
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -65,6 +66,8 @@ class DatabaseStatus:
     connected: bool
     pgvector: bool
     detail: str | None = None
+    migration: str | None = None  # the database's Alembic revision
+    migrations_current: bool | None = None  # at the latest revision (None: not checked)
 
 
 async def check_database() -> DatabaseStatus:
@@ -80,11 +83,34 @@ async def check_database() -> DatabaseStatus:
             has_vector = await conn.scalar(
                 text("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')")
             )
+            has_versions = await conn.scalar(text("SELECT to_regclass('alembic_version')"))
+            current = (
+                await conn.scalar(text("SELECT version_num FROM alembic_version"))
+                if has_versions
+                else None
+            )
     except Exception as exc:  # report, never crash the health check
         return DatabaseStatus(connected=False, pgvector=False, detail=type(exc).__name__)
 
+    head = latest_revision()
+    detail = None
+    if not has_vector:
+        detail = "pgvector extension not installed; run migrations"
+    elif current != head:
+        detail = f"database at migration {current or 'none'}, latest is {head}; run migrations"
     return DatabaseStatus(
         connected=True,
         pgvector=bool(has_vector),
-        detail=None if has_vector else "pgvector extension not installed; run migrations",
+        detail=detail,
+        migration=current,
+        migrations_current=current == head,
     )
+
+
+def latest_revision() -> str | None:
+    """The newest Alembic revision shipped with this code."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    ini = Path(__file__).resolve().parents[2] / "alembic.ini"
+    return ScriptDirectory.from_config(Config(str(ini))).get_current_head()

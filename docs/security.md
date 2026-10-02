@@ -65,10 +65,13 @@ every AI path with an *adversarial model* that fills every field with fabricated
 
 ## Authentication and authorization
 
-- **Today**: single-user development mode. `DEV_USER_EMAIL` is the identity, production
-  refuses every request (401), and `/docs` is off in production. *Fixed in the audit*: the
-  development identity is only given to requests from the local machine (loopback), so a
-  server started without `APP_ENV=production` doesn't hand it to the network.
+- **Development**: `AUTH_MODE=dev`; `DEV_USER_EMAIL` is the identity, given only to
+  requests from the local machine (loopback).
+- **Production**: `AUTH_MODE=proxy` (required; the API refuses to start otherwise). An
+  authenticating reverse proxy signs the user in and forwards their email and a shared
+  secret (32+ characters, compared in constant time). Requests without the secret get 401,
+  and the proxy overwrites both headers, so clients can't forge them. `/docs` is off. See
+  [deployment.md](deployment.md).
 - **Ownership**: every personal record is reached through the caller's profile (or
   `Job.created_by_user_id`); another user's IDs return 404. Body IDs (attached documents,
   interviews, coursework, evidence subjects, the agent's job) are checked the same way.
@@ -159,9 +162,9 @@ production. Browser assistance is covered below.
 
 ## Known limitations and next steps
 
-- **Real authentication** is not implemented yet. When it arrives, prefer a bearer token.
-  With cookies, keep the Origin check, use `SameSite=Strict`, and never allow credentialed
-  wildcard CORS.
+- **First-party login** is not implemented; production relies on the authenticating
+  proxy. If a first-party login is added, prefer a bearer token. With cookies, keep the
+  Origin check, use `SameSite=Strict`, and never allow credentialed wildcard CORS.
 - **Rate limits and pagination**: AI-backed endpoints and list endpoints have no per-user
   rate limit or pagination yet. In a multi-user deployment, add them at the proxy or app
   level.

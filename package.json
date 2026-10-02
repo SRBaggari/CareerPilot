@@ -12,6 +12,7 @@
   "scripts": {
     "dev:web": "npm run dev --workspace web",
     "dev:api": "cd apps/api && uv run uvicorn app.main:app --reload --port 8000",
+    "build": "npm run build --workspace web",
     "build:web": "npm run build --workspace web",
     "lint": "npm run lint --workspace web && npm run lint:api",
     "lint:api": "cd apps/api && uv run ruff check . && uv run ruff format --check .",
@@ -20,11 +21,13 @@
     "test": "npm run test --workspace web && npm run test:api",
     "test:api": "cd apps/api && uv run pytest",
     "test:e2e": "cd apps/api && bash tests/e2e/run.sh",
+    "check:api": "cd apps/api && uv run python -m app.check",
     "format": "prettier --write . && cd apps/api && uv run ruff format .",
     "format:check": "prettier --check .",
     "db:up": "docker compose -f infra/docker-compose.yml up -d",
     "db:down": "docker compose -f infra/docker-compose.yml down",
-    "db:migrate": "cd apps/api && uv run alembic upgrade head"
+    "db:migrate": "cd apps/api && uv run alembic upgrade head",
+    "mock-site": "cd apps/api && uv run python -m app.automation.mock_site"
   },
   "devDependencies": {
     "prettier": "^3.9.9",

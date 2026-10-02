@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.routes.health import database_status
+from app.api.routes.health import StorageCheck, database_status, storage_status
 from app.db.session import DatabaseStatus
 
 
@@ -24,8 +24,37 @@ def test_readiness_ready_when_db_and_pgvector_available(app: FastAPI, client: Te
     assert response.status_code == 200
     assert response.json() == {
         "status": "ready",
-        "database": {"connected": True, "pgvector": True, "detail": None},
+        "database": {
+            "connected": True,
+            "pgvector": True,
+            "detail": None,
+            "migration": None,
+            "migrations_current": None,
+        },
+        "storage": {"writable": True},
     }
+
+
+def test_readiness_503_when_migrations_are_behind(app: FastAPI, client: TestClient) -> None:
+    _override_db(
+        app,
+        DatabaseStatus(
+            connected=True,
+            pgvector=True,
+            migration="0016",
+            migrations_current=False,
+            detail="database at migration 0016, latest is 0017; run migrations",
+        ),
+    )
+    response = client.get("/health/ready")
+    assert response.status_code == 503 and "run migrations" in response.json()["database"]["detail"]
+
+
+def test_readiness_503_when_storage_is_not_writable(app: FastAPI, client: TestClient) -> None:
+    _override_db(app, DatabaseStatus(connected=True, pgvector=True))
+    app.dependency_overrides[storage_status] = lambda: StorageCheck(writable=False)
+    response = client.get("/health/ready")
+    assert response.status_code == 503 and response.json()["storage"]["writable"] is False
 
 
 def test_readiness_503_when_pgvector_missing(app: FastAPI, client: TestClient) -> None:
@@ -48,3 +77,9 @@ def test_cors_allows_configured_frontend_origin(client: TestClient) -> None:
         headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "GET"},
     )
     assert response.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+def test_health_checks_answer_head_requests(app: FastAPI, client: TestClient) -> None:
+    _override_db(app, DatabaseStatus(connected=True, pgvector=True, migrations_current=True))
+    assert client.head("/health").status_code == 200
+    assert client.head("/health/ready").status_code == 200

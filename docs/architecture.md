@@ -185,12 +185,17 @@ to that evidence verbatim; everything else unsupported is rejected and audited. 
 - No autonomous loops: bounded advancing on request, a per-run tool-call limit.
 - Every action is logged in `agent_action_logs`, redacted so no secret is stored.
 
-## 7. Authentication _(planned)_
+## 7. Authentication _(proxy authentication implemented; first-party login planned)_
 
-Auth.js (NextAuth v5) in the Next.js app manages sign-in and sessions. The backend will verify a
-short-lived token issued for the signed-in user on each request, and every table holding
-candidate data will be scoped by user ID. `AUTH_SECRET` is already reserved in
-`apps/web/.env.example`.
+- `AUTH_MODE=dev`: development only. Requests from the local machine act as
+  `DEV_USER_EMAIL`.
+- `AUTH_MODE=proxy`: required in production. An authenticating reverse proxy (Caddy with
+  basic auth in `deploy/`, or oauth2-proxy for single sign-on) signs the user in and
+  forwards their email plus a shared secret. The API accepts the identity only with the
+  secret. See [deployment.md](deployment.md).
+- A first-party login (Auth.js, short-lived tokens) can replace the proxy later; callers
+  depend only on `get_current_user`, so nothing else changes. Every table holding
+  candidate data is already scoped to the user.
 
 ## 8. Frontend
 

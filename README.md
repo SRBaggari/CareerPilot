@@ -76,18 +76,27 @@ See [docs/architecture.md](docs/architecture.md) for the full design.
 npm install                    # JS deps (root + apps/web)
 cd apps/api && uv sync && cd ../..
 
-# 2. Configure environment
+# 2. Configure environment (defaults work as-is)
 cp apps/web/.env.example apps/web/.env.local
 cp apps/api/.env.example apps/api/.env
+(cd apps/api && uv run playwright install chromium)   # browser-assisted applications
 
 # 3. Start PostgreSQL + pgvector and run migrations
 npm run db:up                  # requires Docker
 npm run db:migrate
 
-# 4. Run the apps (in two terminals)
+# 4. Run the apps (in separate terminals)
 npm run dev:api                # http://localhost:8000  (docs at /docs)
 npm run dev:web                # http://localhost:3000
+npm run mock-site              # optional: mock application site on :8790
+
+# 5. Check the setup
+npm run check:api
 ```
+
+**Production:** see [docs/deployment.md](docs/deployment.md) for the Docker images, HTTPS,
+login, configuration ([.env.example](.env.example)), operations, and the full fresh-clone
+guide.
 
 Open http://localhost:3000/profile to build your master profile. Until authentication is
 added, the API acts as the local user set by `DEV_USER_EMAIL` in `apps/api/.env`.
@@ -112,7 +121,10 @@ All commands are run from the repository root.
 | `npm run typecheck`    | `tsc` (after `next typegen`) + `mypy --strict`          |
 | `npm run lint`         | ESLint + Ruff lint + Ruff format check                  |
 | `npm run format`       | Prettier + Ruff format (writes changes)                 |
-| `npm run build:web`    | Production build of the frontend                        |
+| `npm run build`        | Production build of the frontend                        |
+| `npm run check:api`    | Backend preflight: config, database, migrations, storage |
+| `npm run mock-site`    | Mock application site for browser assistance (dev)      |
+| `npm run test:e2e`     | Browser end-to-end tests on an isolated stack           |
 | `npm run db:up/down`   | Start/stop local Postgres (Docker)                      |
 | `npm run db:migrate`   | Apply Alembic migrations                                |
 

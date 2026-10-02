@@ -1,0 +1,47 @@
+# CareerPilot's front door: HTTPS (automatic Let's Encrypt certificates), login, routing.
+#
+# - Everything except the liveness check requires a login (HTTP basic auth over HTTPS).
+# - /api/* and /health* go to the API, everything else to the web app: one origin, so
+#   the browser needs no CORS and sends the login with every API call.
+# - The API trusts the signed-in user only because Caddy also sends AUTH_PROXY_SECRET.
+#   Both headers are set here, overwriting anything a client sends.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	@protected not path /health
+	basic_auth @protected {
+		{$BASIC_AUTH_USER} {$BASIC_AUTH_PASSWORD_HASH}
+	}
+
+	@api path /api/* /health /health/*
+	handle @api {
+		reverse_proxy api:8000 {
+			header_up X-CareerPilot-User {http.auth.user.id}
+			header_up X-CareerPilot-Proxy-Secret {$AUTH_PROXY_SECRET}
+			header_up X-Request-ID {http.request.uuid}
+			# Generation and browser-assisted applications can take a while.
+			transport http {
+				read_timeout 180s
+			}
+		}
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

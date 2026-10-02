@@ -148,6 +148,27 @@ class _Session:
         self.outcome.log("blocked_popup", "The page tried to open another window.")
         await page.close()
 
+    def popup_attempt(self, source: object, target: object = "") -> None:
+        """Reported by the page guard: an attempt to open a window or send a form to one."""
+        self.outcome.blocked.append(f"POPUP {str(target)[:200]}")
+        self.outcome.log("blocked_popup", "The page tried to open another window.")
+
+
+_PAGE_GUARD = """(() => {
+  const report = (target) => { try { window.__careerpilotPopup(String(target || "")); } catch {} };
+  window.open = function (url) { report(url); return null; };
+  const submit = HTMLFormElement.prototype.submit;
+  const opensWindow = (form) => form.target && !["", "_self"].includes(form.target);
+  HTMLFormElement.prototype.submit = function () {
+    if (opensWindow(this)) { report("form:" + this.target); return; }
+    return submit.call(this);
+  };
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (opensWindow(form)) { event.preventDefault(); report("form:" + form.target); }
+  }, true);
+})();"""
+
 
 def _origin(url: str) -> str:
     parts = urlparse(url)
@@ -172,7 +193,12 @@ async def _close_websocket(ws: WebSocketRoute) -> None:
 @asynccontextmanager
 async def _browser(settings: Settings, outcome: Outcome, url: str) -> AsyncIterator[_Session]:
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=settings.automation_headless)
+        browser = await pw.chromium.launch(
+            headless=settings.automation_headless,
+            # No popups or new windows at all: a request from a brand-new window can race
+            # the request gate before it attaches, so new windows are refused outright.
+            args=["--block-new-web-contents"],
+        )
         try:
             context = await browser.new_context(
                 accept_downloads=False,
@@ -185,6 +211,10 @@ async def _browser(settings: Settings, outcome: Outcome, url: str) -> AsyncItera
             await context.route("**/*", session.gate)
             await context.route_web_socket("**/*", _close_websocket)
             context.on("page", session.popup)
+            # Runs before any page script: opening windows (or sending a form into one) is
+            # refused and reported, so such a page is treated as unsafe.
+            await context.expose_binding("__careerpilotPopup", session.popup_attempt)
+            await context.add_init_script(_PAGE_GUARD)
             yield session
         finally:
             await browser.close()

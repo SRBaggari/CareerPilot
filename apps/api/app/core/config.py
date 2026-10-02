@@ -16,11 +16,15 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        # Configuration errors must never echo values: they can include passwords and keys.
+        hide_input_in_errors=True,
     )
 
     app_name: str = "CareerPilot API"
     app_env: Literal["development", "test", "production"] = "development"
     log_level: str = "INFO"
+    # "json": one JSON object per line (for log collectors); "text": readable lines.
+    log_format: Literal["text", "json"] = "text"
     cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:3000"]
     )
@@ -34,9 +38,17 @@ class Settings(BaseSettings):
     database_url: SecretStr | None = None
     database_echo: bool = False
 
-    # Until real authentication exists, development/test requests act as this user.
-    # Ignored (and all requests rejected) when app_env is "production".
+    # Who is making a request:
+    # - "dev": every request from this computer acts as DEV_USER_EMAIL (development only).
+    # - "proxy": an authenticating reverse proxy in front of the API (e.g. Caddy with basic
+    #   auth, or oauth2-proxy) sends the signed-in user's email in AUTH_PROXY_USER_HEADER,
+    #   plus AUTH_PROXY_SECRET in AUTH_PROXY_SECRET_HEADER to prove the request came
+    #   through it. Required in production.
+    auth_mode: Literal["dev", "proxy"] = "dev"
     dev_user_email: str | None = None
+    auth_proxy_user_header: str = "X-CareerPilot-User"
+    auth_proxy_secret_header: str = "X-CareerPilot-Proxy-Secret"  # noqa: S105 - a header name
+    auth_proxy_secret: SecretStr | None = None
 
     # AI provider configuration.
     llm_provider: str = "anthropic"
@@ -95,8 +107,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _safe_in_production(self) -> "Settings":
-        if self.app_env == "production" and self.database_echo:
-            raise ValueError("DATABASE_ECHO would log personal data; it is refused in production.")
+        """Refuse to start in production with an unsafe or incomplete configuration."""
+        if self.app_env != "production":
+            return self
+        problems = production_problems(self)
+        if problems:
+            raise ValueError("Unsafe production configuration: " + " ".join(problems))
         return self
 
     @field_validator("database_url")
@@ -105,6 +121,30 @@ class Settings(BaseSettings):
         if value is not None and not value.get_secret_value().startswith("postgresql+asyncpg://"):
             raise ValueError("DATABASE_URL must use the 'postgresql+asyncpg://' scheme")
         return value
+
+
+def production_problems(settings: Settings) -> list[str]:
+    """What stops ``settings`` from being safe to run in production (empty when fine)."""
+    problems: list[str] = []
+    if settings.database_url is None:
+        problems.append("DATABASE_URL is required.")
+    if settings.database_echo:
+        problems.append("DATABASE_ECHO would log personal data; turn it off.")
+    if settings.auth_mode != "proxy":
+        problems.append("AUTH_MODE must be 'proxy' (an authenticating reverse proxy).")
+    secret = settings.auth_proxy_secret.get_secret_value() if settings.auth_proxy_secret else ""
+    if settings.auth_mode == "proxy" and len(secret) < 32:
+        problems.append("AUTH_PROXY_SECRET must be at least 32 random characters.")
+    insecure = [o for o in settings.cors_origins if not o.startswith("https://")]
+    if insecure:
+        problems.append(f"CORS_ORIGINS must use https: {', '.join(insecure)}.")
+    if set(settings.allowed_hosts) <= {"localhost", "127.0.0.1", "[::1]"}:
+        problems.append("ALLOWED_HOSTS must list the public host name(s).")
+    if settings.automation_mock_site_url:
+        problems.append("AUTOMATION_MOCK_SITE_URL is for development only; unset it.")
+    if "mock" in settings.discovery_providers:
+        problems.append("DISCOVERY_PROVIDERS must not include 'mock' (sample data).")
+    return problems
 
 
 @lru_cache

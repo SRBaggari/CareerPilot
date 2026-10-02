@@ -26,6 +26,7 @@ from app.documents.models import ClaimStatus, GeneratedClaim
 from app.users.dependencies import get_current_user
 from app.users.models import User
 
+from ..settings_helpers import production_settings
 from .conftest import client_for, make_user
 from .test_applications_api import APPS, approve, make_job, move, ok
 from .test_evidence_search import SpyEmbedder
@@ -350,7 +351,7 @@ async def test_runs_are_private(api: httpx2.AsyncClient, db: AsyncSession) -> No
 
 
 async def test_requests_without_an_identity_are_refused(db: AsyncSession, user: User) -> None:
-    production = Settings(_env_file=None, app_env="production", dev_user_email="me@localhost.dev")
+    production = production_settings()  # proxy auth, but no proxy headers sent
     async with client_for(
         db, user, settings=production, overrides={get_current_user: get_current_user}
     ) as anonymous:

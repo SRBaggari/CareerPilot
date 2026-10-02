@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import type { NextConfig } from "next";
 
 const api = new URL(process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000").origin;
@@ -19,7 +21,16 @@ const contentSecurityPolicy = [
   "object-src 'none'",
 ].join("; ");
 
+// Container builds (NEXT_OUTPUT=standalone) produce a self-contained server in
+// .next/standalone. The monorepo root is the tracing root, so workspace dependencies are
+// included.
+const standalone =
+  process.env.NEXT_OUTPUT === "standalone"
+    ? { output: "standalone" as const, outputFileTracingRoot: path.resolve(process.cwd(), "../..") }
+    : {};
+
 const nextConfig: NextConfig = {
+  ...standalone,
   reactStrictMode: true,
   poweredByHeader: false,
   async headers() {

@@ -22,9 +22,11 @@ from app.discovery.providers.mock import MockJobProvider
 from app.discovery.registry import PROVIDERS, ProviderRegistry, build_registry
 from app.profiles.models import EmploymentType, ExperienceLevel
 
+from .settings_helpers import production_settings, unvalidated
+
 pytestmark = pytest.mark.anyio
 DEV = Settings(_env_file=None, app_env="development")
-PROD = Settings(_env_file=None, app_env="production")
+PROD = unvalidated(production_settings(), discovery_providers=["mock"])
 
 
 @pytest.fixture

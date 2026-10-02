@@ -1,0 +1,11 @@
+# Build context for apps/web/Dockerfile (the repository root).
+**/node_modules
+**/.next
+**/.env
+**/.env.*
+!**/.env.example
+.git
+apps/api
+docs
+infra
+deploy

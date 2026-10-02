@@ -1,0 +1,114 @@
+# CareerPilot in production on one host: PostgreSQL + pgvector, the API, the web app, and
+# Caddy (HTTPS from Let's Encrypt, login, routing). See docs/deployment.md.
+#
+#   docker compose --env-file .env -f deploy/docker-compose.yml up -d --build
+#
+# Only Caddy publishes ports (80, 443). The database and API are reachable only on the
+# internal network.
+name: careerpilot
+
+x-api-environment: &api-environment
+  APP_ENV: production
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOG_FORMAT: json
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-careerpilot}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-careerpilot}
+  CORS_ORIGINS: https://${DOMAIN:?set DOMAIN}
+  ALLOWED_HOSTS: ${DOMAIN},127.0.0.1
+  AUTH_MODE: proxy
+  AUTH_PROXY_SECRET: ${AUTH_PROXY_SECRET:?set AUTH_PROXY_SECRET}
+  STORAGE_DIR: /data/storage
+  MAX_RESUME_BYTES: ${MAX_RESUME_BYTES:-5242880}
+  MAX_REQUEST_BYTES: ${MAX_REQUEST_BYTES:-10485760}
+  LLM_PROVIDER: ${LLM_PROVIDER:-anthropic}
+  LLM_MODEL: ${LLM_MODEL:-claude-opus-5-5}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-hash}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+  VOYAGE_API_KEY: ${VOYAGE_API_KEY:-}
+  RESUME_PARSER: ${RESUME_PARSER:-auto}
+  JOB_ANALYZER: ${JOB_ANALYZER:-auto}
+  MATCH_JUDGE: ${MATCH_JUDGE:-auto}
+  RESUME_GENERATOR: ${RESUME_GENERATOR:-auto}
+  CLAIM_VERIFIER: ${CLAIM_VERIFIER:-auto}
+  COVER_LETTER_GENERATOR: ${COVER_LETTER_GENERATOR:-auto}
+  ANSWER_GENERATOR: ${ANSWER_GENERATOR:-auto}
+  DISCOVERY_PROVIDERS: ${DISCOVERY_PROVIDERS:-}
+  AUTOMATION_HEADLESS: "true"
+  AUTOMATION_TIMEOUT_MS: ${AUTOMATION_TIMEOUT_MS:-15000}
+  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-careerpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-careerpilot}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../infra/postgres/init/01-extensions.sql:/docker-entrypoint-initdb.d/01-extensions.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # One-shot: brings the schema to the latest migration before the API starts.
+  migrate:
+    build: ../apps/api
+    image: careerpilot-api
+    command: ["alembic", "upgrade", "head"]
+    environment: *api-environment
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: careerpilot-api
+    restart: unless-stopped
+    environment: *api-environment
+    volumes:
+      - storage:/data/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: https://${DOMAIN}
+    image: careerpilot-web
+    restart: unless-stopped
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+      BASIC_AUTH_USER: ${BASIC_AUTH_USER:?set BASIC_AUTH_USER (your email)}
+      BASIC_AUTH_PASSWORD_HASH: ${BASIC_AUTH_PASSWORD_HASH:?set BASIC_AUTH_PASSWORD_HASH}
+      AUTH_PROXY_SECRET: ${AUTH_PROXY_SECRET}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - web
+
+volumes:
+  pgdata:
+  storage:
+  caddy_data:
+  caddy_config:

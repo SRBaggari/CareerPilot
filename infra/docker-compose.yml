@@ -11,7 +11,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-careerpilot}
       POSTGRES_DB: ${POSTGRES_DB:-careerpilot}
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"  # local only: not reachable from the network
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432" # local only: not reachable from the network
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
