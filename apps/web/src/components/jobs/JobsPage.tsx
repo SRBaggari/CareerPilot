@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { Badge, Card, EmptyState } from "@/components/ui";
+import { Badge, Card, EmptyState, LoadError } from "@/components/ui";
 import { listJobs, type JobSummary } from "@/lib/api/jobs";
 import { JOB_TYPE_LABELS, label, WORK_MODE_LABELS } from "@/lib/profile/options";
 
@@ -43,17 +43,19 @@ export function JobsList({ jobs }: { jobs: JobSummary[] }) {
 
 export function JobsPage() {
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
+  const [failure, setFailure] = useState<unknown>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     listJobs().then(
       (items) => !cancelled && setJobs(items),
-      () => !cancelled && setJobs([]),
+      (e: unknown) => !cancelled && setFailure(e ?? new Error()),
     );
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 space-y-6 px-4 py-6 sm:px-6 sm:py-8">
@@ -74,7 +76,16 @@ export function JobsPage() {
         </Link>
       </div>
       <Card id="your-jobs" title="Your jobs">
-        {jobs === null ? (
+        {failure ? (
+          <LoadError
+            what="your jobs"
+            error={failure}
+            onRetry={() => {
+              setFailure(null);
+              setAttempt((n) => n + 1);
+            }}
+          />
+        ) : jobs === null ? (
           <p role="status" className="text-sm text-zinc-500">
             Loading…
           </p>

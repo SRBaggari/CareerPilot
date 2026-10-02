@@ -252,6 +252,26 @@ async def test_indexing_is_incremental_and_follows_edits(
     assert row.embedding_model == "hash-v1" and row.embedded_at is not None
 
 
+async def test_renaming_a_record_reembeds_its_evidence(
+    api: httpx2.AsyncClient, embedder: SpyEmbedder
+) -> None:
+    ids = await seed(api)
+    await _search(api, ids["candidate"], "anything")
+    assert embedder.documents == 4
+    # The project's title is part of each of its evidence rows' embedded text.
+    renamed = await api.put(
+        f"{PROFILE}/projects/{ids['project']}", json={"title": "Fraud Detection Platform"}
+    )
+    assert renamed.status_code == 200, renamed.text
+    body = await _search(api, ids["candidate"], "Fraud Detection Platform")
+    assert body["newly_indexed"] == 2 and embedder.documents == 6  # only that project's rows
+    # Saving a record unchanged doesn't throw its vectors away.
+    await api.put(
+        f"{PROFILE}/projects/{ids['project']}", json={"title": "Fraud Detection Platform"}
+    )
+    assert (await _search(api, ids["candidate"], "anything"))["newly_indexed"] == 0
+
+
 async def test_vectors_from_another_model_are_reembedded_not_mixed(
     api: httpx2.AsyncClient, db: AsyncSession, embedder: SpyEmbedder
 ) -> None:

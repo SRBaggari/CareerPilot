@@ -7,7 +7,7 @@ applications, while a human approves every step that matters.
 ```
 Master profile → Job discovery → JD analysis → Semantic matching → Skill-gap analysis
   → Tailored resume → Tailored cover letter → Claim verification
-  → HUMAN APPROVAL → Browser-assisted application (stops before submit) → Tracking
+  → HUMAN APPROVAL → Browser-assisted application (stops for your confirmation) → Tracking
 ```
 
 > **Status: Complete dashboard.** A responsive app with a dashboard (`/`) and sections for
@@ -45,7 +45,8 @@ Master profile → Job discovery → JD analysis → Semantic matching → Skill
 
 1. **No invented candidate information.** Everything comes from stored evidence.
 2. **Traceable claims.** Every AI-generated claim must link to the evidence that supports it.
-3. **Human approval before any submission.** Browser automation stops before the final submit.
+3. **Human approval before any submission.** Browser automation stops before the final submit
+   and submits only after you confirm the exact review it shows you.
 4. **Respectful automation.** No scraping sites that prohibit it; no bypassing auth or CAPTCHA.
 5. **Secrets live in environment variables**, never in code.
 
@@ -98,8 +99,9 @@ npm run check:api
 login, configuration ([.env.example](.env.example)), operations, and the full fresh-clone
 guide.
 
-Open http://localhost:3000/profile to build your master profile. Until authentication is
-added, the API acts as the local user set by `DEV_USER_EMAIL` in `apps/api/.env`.
+Open http://localhost:3000/profile to build your master profile. In development the API acts
+as the local user set by `DEV_USER_EMAIL` in `apps/api/.env`; in production the reverse proxy
+signs users in (see [docs/deployment.md](docs/deployment.md)).
 
 Resume parsing works offline with a rule-based parser. To use Claude for extraction, set
 `ANTHROPIC_API_KEY` in `apps/api/.env` (`RESUME_PARSER=auto` picks it up). Evidence search

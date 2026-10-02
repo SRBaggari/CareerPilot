@@ -149,3 +149,18 @@ def test_the_llm_client_is_shared_and_bounded() -> None:
     assert isinstance(first, AnthropicProvider) and isinstance(second, AnthropicProvider)
     assert first._client is second._client  # one connection pool per process
     assert first._client.timeout == 45 and first._client.max_retries == 0
+
+
+def test_an_embedding_outage_is_a_503_with_a_clear_message() -> None:
+    from app.ai.embeddings import EmbeddingError
+
+    app = create_app(Settings(_env_file=None, app_env="test"))
+    outage = APIRouter()
+
+    @outage.get("/outage")
+    async def _outage() -> None:
+        raise EmbeddingError("The embedding service is rate limiting requests.")
+
+    app.include_router(outage)
+    response = TestClient(app, raise_server_exceptions=False).get("/outage")
+    assert response.status_code == 503 and "rate limiting" in response.json()["detail"]

@@ -8,9 +8,10 @@ This tracks every application from discovery to offer.
   - `/applications`: the dashboard, a board (Kanban) view and a list view;
   - `/applications/[id]`: the detail page and timeline.
 
-**CareerPilot never submits an application.** "Submitted" records that *you* submitted it.
-It is only possible after your explicit approval, and the database enforces this, not
-just the application code.
+**Nothing is submitted without you.** "Submitted" records either that *you* submitted it
+yourself, or that browser assistance submitted it after you confirmed the exact review
+([browser-assistance.md](browser-assistance.md)). Either is only possible after your
+explicit approval, and the database enforces this, not just the application code.
 
 ## Lifecycle
 

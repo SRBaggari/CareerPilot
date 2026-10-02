@@ -395,3 +395,24 @@ async def test_a_run_is_advanced_by_one_request_at_a_time(
     await db.execute(update(AgentRun).values(updated_at=stale))
     resumed = await advance(api, run["id"])
     assert resumed["status"] in ("waiting_for_human", "ready", "completed")
+
+
+async def test_each_eligibility_question_needs_its_own_answer(
+    api: httpx2.AsyncClient, db: AsyncSession
+) -> None:
+    from datetime import date
+
+    from app.jobs.models import Job
+
+    await build_profile(api)
+    job_id = await build_job(api)
+    await db.execute(update(Job).values(application_deadline=date(2020, 1, 1)))
+    run = await advance(api, (await start(api, job_id=job_id))["id"])
+    assert (run["stage"], run["pause"]["kind"]) == ("analyze", "eligibility_uncertain")
+    assert "deadline has passed" in run["pause"]["message"]
+    # Confirming the late application is not a confirmation of the qualifications.
+    run = await advance(api, run["id"], confirm_eligibility=True)
+    assert (run["stage"], run["pause"]["kind"]) == ("match", "eligibility_uncertain")
+    assert "required qualifications" in run["pause"]["message"]
+    run = await advance(api, run["id"], confirm_eligibility=True)
+    assert run["stage"] not in ("analyze", "match")

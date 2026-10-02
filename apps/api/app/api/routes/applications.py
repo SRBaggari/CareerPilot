@@ -1,8 +1,8 @@
 """The application tracker: dashboard, list with filters and search, detail, lifecycle,
 approval, interviews and follow-up reminders.
 
-CareerPilot never submits applications. "Submitted" records that you did, and is only
-possible after your explicit approval.
+"Submitted" records that you submitted the application, or that browser assistance did after
+you confirmed the exact review. Either is only possible after your explicit approval.
 """
 
 import uuid

@@ -47,7 +47,9 @@ class ApplicationStatus(StrEnum):
     ANALYZED = "analyzed"  # requirements analyzed and matched
     APPLICATION_PREPARED = "application_prepared"  # resume, cover letter, answers ready
     AWAITING_APPROVAL = "awaiting_approval"  # waiting for the candidate's explicit approval
-    SUBMITTED = "submitted"  # the candidate submitted it (CareerPilot never submits)
+    SUBMITTED = (
+        "submitted"  # submitted by the candidate, or by browser assistance on their confirmation
+    )
     ASSESSMENT = "assessment"  # a test or take-home
     INTERVIEW = "interview"
     OFFER = "offer"

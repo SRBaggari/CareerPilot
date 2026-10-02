@@ -293,3 +293,23 @@ describe("JobsPage and JobAnalysisPage", () => {
     expect(screen.getByRole("region", { name: "Analyze a job" })).toBeVisible();
   });
 });
+
+describe("JobsPage", () => {
+  it("says when jobs couldn't be loaded instead of showing an empty list, and retries", async () => {
+    let fail = true;
+    stubApi({
+      "GET /jobs": () =>
+        fail
+          ? { status: 503, body: { detail: "The database is unavailable." } }
+          : { status: 200, body: [] },
+    });
+    render(<JobsPage />);
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Could not load your jobs.");
+    expect(alert).toHaveTextContent("The database is unavailable.");
+    expect(screen.queryByText(/No jobs analyzed yet/)).toBeNull();
+    fail = false;
+    fireEvent.click(within(alert).getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText(/No jobs analyzed yet/)).toBeVisible();
+  });
+});

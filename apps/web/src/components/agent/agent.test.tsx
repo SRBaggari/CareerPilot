@@ -150,6 +150,28 @@ describe("AgentRunPage", () => {
     expect(await screen.findByText(/submitted and being tracked/)).toBeVisible();
     expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
   });
+
+  it("checks back on a run another request is advancing until it stops", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    let reads = 0;
+    stubApi({
+      "GET /agent/runs/r1": () => {
+        reads += 1;
+        return {
+          status: 200,
+          body: reads < 2 ? run({ status: "running", pause: null }) : run(),
+        };
+      },
+    });
+    render(<AgentRunPage runId="r1" />);
+    expect(await screen.findByText("Working…")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(await screen.findByText("Waiting for you")).toBeVisible();
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(reads).toBe(2); // stopped checking once the run stopped
+    vi.useRealTimers();
+  });
 });
 
 describe("AgentPage", () => {

@@ -13,6 +13,8 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
+from app.ai.embeddings import EmbeddingError
+
 
 class DomainError(Exception):
     status_code = status.HTTP_400_BAD_REQUEST
@@ -93,4 +95,14 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=status.HTTP_409_CONFLICT,
             content={"detail": "This changed at the same time elsewhere. Refresh and try again."},
+        )
+
+    @app.exception_handler(EmbeddingError)
+    async def _embedding(_: Request, exc: EmbeddingError) -> JSONResponse:
+        # The embedding service failed somewhere no caller handled it (matching, tailoring,
+        # indexing): a temporary outage, not a bug. Its messages never contain secrets.
+        logging.getLogger("careerpilot.errors").warning("Embedding service error: %s", exc)
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"detail": f"Evidence search is unavailable right now: {exc} Try again."},
         )

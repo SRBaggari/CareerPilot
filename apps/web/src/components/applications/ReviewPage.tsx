@@ -276,6 +276,11 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
                 and verification results above, and I approve this version of the application.
               </span>
             </label>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">
+              Approving checks your resume and cover letter once more against your profile as it is
+              now. If you changed your profile since they were generated (for example your phone
+              number or a job title), regenerate them first, or approval will be refused.
+            </p>
             <Field id="decision-note" label="Note (optional)">
               <input
                 id="decision-note"

@@ -143,3 +143,29 @@ export function Badge({
 export function EmptyState({ children }: { children: ReactNode }) {
   return <p className="text-sm text-zinc-500 italic dark:text-zinc-400">{children}</p>;
 }
+
+/** A failed load, said plainly (never shown as "nothing here"), with a way to try again. */
+export function LoadError({
+  what,
+  error,
+  onRetry,
+}: {
+  what: string;
+  error: unknown;
+  onRetry: () => void;
+}) {
+  const detail =
+    error instanceof Error && error.message ? error.message : "The server didn't respond.";
+  return (
+    <div
+      role="alert"
+      className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+    >
+      <p className="font-medium">Could not load {what}.</p>
+      <p className="mt-1">{detail}</p>
+      <Button size="sm" className="mt-2" onClick={onRetry}>
+        Retry
+      </Button>
+    </div>
+  );
+}

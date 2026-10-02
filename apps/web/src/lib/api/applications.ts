@@ -190,3 +190,10 @@ export const formatDateTime = (value: string | null) =>
   value
     ? new Date(value).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })
     : "—";
+
+/** A date picked in a date input ("2026-10-15") as the end of that day in the user's own
+ * time zone. `new Date("2026-10-15")` would be UTC midnight, which shows as the previous
+ * day anywhere west of UTC. */
+export function endOfLocalDay(date: string): string {
+  return new Date(`${date}T23:59:59`).toISOString();
+}

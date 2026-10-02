@@ -122,6 +122,19 @@ function ApplicationCard({
   app: ApplicationSummary;
   onMove: (app: ApplicationSummary, status: ApplicationStatus) => void;
 }) {
+  // Choosing in the list only picks a target (arrow keys change a closed select's value in
+  // some browsers); the Move button applies it.
+  // (Keyed by status, so a card that moved starts from its new status.)
+  const [target, setTarget] = useState<ApplicationStatus>(app.status);
+  const label = `${app.position} at ${app.company}`;
+  function apply() {
+    if (
+      FINAL_STATUSES.includes(target) &&
+      !window.confirm(`Mark ${label} as ${STATUS_LABELS[target]}? This is recorded in its history.`)
+    )
+      return;
+    onMove(app, target);
+  }
   return (
     <li
       aria-label={`${app.position} at ${app.company}`}
@@ -141,25 +154,36 @@ function ApplicationCard({
         ) : null}
         {app.applied_at ? <Badge>Applied {formatDate(app.applied_at)}</Badge> : null}
       </p>
-      <label className="block text-xs text-zinc-500">
-        <span className="sr-only">
-          Move {app.position} at {app.company} to
-        </span>
-        <select
-          className={`${inputClass} mt-1 py-1 text-xs`}
-          value={app.status}
-          onChange={(e) => onMove(app, e.target.value as ApplicationStatus)}
+      <div className="mt-1 flex items-center gap-1">
+        <label className="min-w-0 flex-1 text-xs text-zinc-500">
+          <span className="sr-only">Move {label} to</span>
+          <select
+            className={`${inputClass} py-1 text-xs`}
+            value={target}
+            onChange={(e) => setTarget(e.target.value as ApplicationStatus)}
+          >
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button
+          size="sm"
+          disabled={target === app.status}
+          aria-label={`Move ${label}`}
+          onClick={apply}
         >
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {STATUS_LABELS[s]}
-            </option>
-          ))}
-        </select>
-      </label>
+          Move
+        </Button>
+      </div>
     </li>
   );
 }
+
+// Ending statuses: moving there by accident is easy to miss, so it is confirmed.
+const FINAL_STATUSES: ApplicationStatus[] = ["rejected", "withdrawn"];
 
 export function ApplicationsPage() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
@@ -220,8 +244,9 @@ export function ApplicationsPage() {
           Applications
         </h1>
         <p className="text-zinc-600 dark:text-zinc-400">
-          Track every application from discovery to offer. CareerPilot never submits anything: you
-          approve each application and record when you submitted it.
+          Track every application from discovery to offer. Nothing is submitted without you: you
+          approve each application, then either submit it yourself and record it here, or let
+          CareerPilot submit it after you confirm the exact review.
         </p>
       </div>
 
@@ -366,7 +391,11 @@ export function ApplicationsPage() {
                 </h2>
                 <ul className="space-y-2">
                   {column.map((a) => (
-                    <ApplicationCard key={a.id} app={a} onMove={(app, to) => void move(app, to)} />
+                    <ApplicationCard
+                      key={`${a.id}:${a.status}`}
+                      app={a}
+                      onMove={(app, to) => void move(app, to)}
+                    />
                   ))}
                 </ul>
               </section>

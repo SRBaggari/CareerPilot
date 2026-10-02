@@ -62,15 +62,38 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!open) return;
-    firstLink.current?.querySelector<HTMLAnchorElement>("nav a")?.focus();
+    const drawer = firstLink.current;
+    const opener = menuButton.current;
+    drawer?.querySelector<HTMLAnchorElement>("nav a")?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setOpen(false);
-        menuButton.current?.focus();
+      } else if (e.key === "Tab" && drawer) {
+        // A modal dialog: Tab and Shift+Tab cycle through the menu, never behind it.
+        const items = [...drawer.querySelectorAll<HTMLElement>("a[href], button")];
+        const [first, last] = [items[0], items[items.length - 1]];
+        if (!drawer.contains(document.activeElement)) {
+          e.preventDefault();
+          first?.focus();
+        } else if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
       }
     };
+    const scroll = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = scroll;
+      // However it closed (Escape, Close, the backdrop or a link), focus goes back to the
+      // button that opened it.
+      opener?.focus();
+    };
   }, [open]);
 
   return (
@@ -94,7 +117,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Small screens: a top bar and a menu drawer. */}
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-950/95">
+      <header
+        inert={open}
+        className="sticky top-0 z-30 flex items-center justify-between border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden dark:border-zinc-800 dark:bg-zinc-950/95"
+      >
         <Brand />
         <button
           ref={menuButton}
@@ -141,7 +167,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       ) : null}
 
-      <div id="content" className="flex min-w-0 flex-1 flex-col lg:pl-64">
+      <div id="content" inert={open} className="flex min-w-0 flex-1 flex-col lg:pl-64">
         {children}
       </div>
     </div>

@@ -78,8 +78,12 @@ Errors: 404 (not found or not yours), 409 (conflict), 422 (validation, FastAPI's
 - Coursework may only link to the candidate's own education entries. Every item lookup is
   scoped to the current user's profile.
 
-## Identity (temporary)
+## Identity
 
-Authentication arrives in a later phase. Until then, `get_current_user` acts as the single
-local user named by `DEV_USER_EMAIL` in development and test, and **rejects every request
-(401) in production**. Only that dependency will change when Auth.js is added.
+`get_current_user` resolves the user in one of two modes (`AUTH_MODE`):
+
+- **dev** (development and test): the single local user named by `DEV_USER_EMAIL`, and only
+  for requests from this machine.
+- **proxy** (required in production): the reverse proxy signs the user in and forwards
+  their email in a header, with a shared secret the API checks. Requests without both are
+  refused (401). See [deployment.md](deployment.md).

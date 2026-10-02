@@ -8,6 +8,7 @@ import {
   addFollowUp,
   addInterview,
   changeStatus,
+  endOfLocalDay,
   formatDate,
   formatDateTime,
   getApplication,
@@ -538,7 +539,7 @@ export function ApplicationDetailPage({ applicationId }: { applicationId: string
                 void run(() =>
                   addFollowUp(app.id, {
                     subject: followUp.subject,
-                    due_at: new Date(followUp.due).toISOString(),
+                    due_at: endOfLocalDay(followUp.due),
                   }),
                 ).then((done) => done && setFollowUp({ subject: "", due: "" }));
               }}

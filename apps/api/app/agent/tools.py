@@ -548,7 +548,8 @@ async def gather(ctx: Ctx) -> Facts:
     job = await _job(ctx)
     facts: dict[str, object] = {
         "profile_missing": missing,
-        "eligibility_confirmed": ctx.run.inputs.get("confirm_eligibility") is True,
+        "eligibility_confirmed": ctx.run.stage.value
+        in ctx.run.inputs.get("eligibility_confirmed_stages", []),
     }
     if job is None:
         return Facts(**facts)  # type: ignore[arg-type]

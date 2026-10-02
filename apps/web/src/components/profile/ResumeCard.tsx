@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type DragEvent } from "react";
 
-import { Badge, Button, Card, EmptyState } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, LoadError } from "@/components/ui";
 import { ApiError } from "@/lib/api/client";
 import {
   ACCEPTED_TYPES,
@@ -34,13 +34,18 @@ export function ResumeCard({ onChanged }: { onChanged: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [failure, setFailure] = useState<unknown>(null);
   const [textFor, setTextFor] = useState<{ id: string; text: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     listResumes().then(
-      (items) => !cancelled && setResumes(items),
-      () => !cancelled && setResumes([]),
+      (items) => {
+        if (cancelled) return;
+        setResumes(items);
+        setFailure(null);
+      },
+      (e: unknown) => !cancelled && setFailure(e ?? new Error()),
     );
     return () => {
       cancelled = true;
@@ -148,7 +153,16 @@ export function ResumeCard({ onChanged }: { onChanged: () => Promise<void> }) {
       ) : null}
 
       <div className="mt-4">
-        {resumes === null ? null : resumes.length === 0 ? (
+        {failure ? (
+          <LoadError
+            what="your resumes"
+            error={failure}
+            onRetry={() => {
+              setFailure(null);
+              setVersion((v) => v + 1);
+            }}
+          />
+        ) : resumes === null ? null : resumes.length === 0 ? (
           <EmptyState>No resumes uploaded yet.</EmptyState>
         ) : (
           <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">

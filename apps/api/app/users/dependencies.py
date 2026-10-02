@@ -72,9 +72,11 @@ async def get_current_user(
         else _dev_email(request, settings)
     )
     email = raw.strip().lower()
-    await session.execute(insert(User).values(email=email).on_conflict_do_nothing())
     user = await session.scalar(select(User).where(User.email == email))
-    await session.commit()
+    if user is None:  # first sign-in: create the account (once, even if requests race)
+        await session.execute(insert(User).values(email=email).on_conflict_do_nothing())
+        user = await session.scalar(select(User).where(User.email == email))
+        await session.commit()
     if user is None:  # pragma: no cover - the insert above guarantees a row
         raise HTTPException(status_code=500, detail="Could not resolve the user")
     return user

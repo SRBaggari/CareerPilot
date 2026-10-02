@@ -182,13 +182,33 @@ describe("ApplicationsPage", () => {
     });
     render(<ApplicationsPage />);
     await screen.findByLabelText("Status board");
-    fireEvent.change(screen.getByLabelText("Move ML Engineer at Northwind to"), {
-      target: { value: "submitted" },
-    });
+    const select = screen.getByLabelText("Move ML Engineer at Northwind to");
+    fireEvent.change(select, { target: { value: "submitted" } });
+    // Choosing alone moves nothing (keyboard users step through the options).
+    expect(calls.some((c) => c.key === "POST /applications/a1/status")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Move ML Engineer at Northwind" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(/Approve the application first/);
     expect(calls.find((c) => c.key === "POST /applications/a1/status")?.body).toEqual({
       status: "submitted",
     });
+  });
+
+  it("asks before moving an application to an ending status", async () => {
+    const calls = stubApi({
+      "GET /applications/dashboard": () => ({ status: 200, body: dashboard() }),
+      "GET /applications?sort=updated": () => ({ status: 200, body: APPS }),
+      "POST /applications/a1/status": () => ({ status: 200, body: {} }),
+    });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<ApplicationsPage />);
+    await screen.findByLabelText("Status board");
+    fireEvent.change(screen.getByLabelText("Move ML Engineer at Northwind to"), {
+      target: { value: "withdrawn" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Move ML Engineer at Northwind" }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Withdrawn"));
+    expect(calls.some((c) => c.key === "POST /applications/a1/status")).toBe(false);
+    confirm.mockRestore();
   });
 
   it("completes a follow-up reminder from the dashboard", async () => {
@@ -408,6 +428,15 @@ describe("ApplicationDetailPage", () => {
     fireEvent.change(within(followForm).getByLabelText("Due"), { target: { value: "2026-10-07" } });
     fireEvent.click(within(followForm).getByRole("button", { name: "Add follow-up" }));
     expect(await screen.findByLabelText("Follow-ups")).toHaveTextContent("Ask about next steps");
+    // Due at the end of the chosen day in the user's time zone, not UTC midnight (which
+    // shows as the day before anywhere west of UTC).
+    const due = (
+      calls.find((c) => c.key === "POST /applications/a1/follow-ups")?.body as {
+        due_at: string;
+      }
+    ).due_at;
+    expect(new Date(due).getDate()).toBe(7);
+    expect(new Date(due).getHours()).toBe(23);
 
     fireEvent.change(screen.getByLabelText("Notes"), { target: { value: "Updated." } });
     fireEvent.click(screen.getByRole("button", { name: "Save notes" }));

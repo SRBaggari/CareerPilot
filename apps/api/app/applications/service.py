@@ -1,8 +1,8 @@
 """The application tracker: lifecycle, approval, interviews, follow-up reminders, timeline.
 
-CareerPilot never submits an application. "Submitted" records that the candidate submitted
-it, and is only reachable after the candidate explicitly approved the application (the
-database enforces this too).
+Nothing is submitted without the candidate. "Submitted" records that they submitted it, or
+that browser assistance did after they confirmed the exact review; either is only reachable
+after they explicitly approved the application (the database enforces this too).
 """
 
 import uuid

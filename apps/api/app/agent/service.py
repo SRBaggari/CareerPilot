@@ -355,7 +355,13 @@ async def advance(
     secrets = secrets_of(deps.settings)
     log = _Log(session, run, secrets)
     if payload.confirm_eligibility is not None:
-        run.inputs = {**run.inputs, "confirm_eligibility": payload.confirm_eligibility}
+        # A confirmation answers the question asked at this stage (a passed deadline, or
+        # missing qualifications), never one the agent hasn't asked yet.
+        confirmed = [s for s in run.inputs.get("eligibility_confirmed_stages", [])
+                     if s != run.stage.value]  # fmt: skip
+        if payload.confirm_eligibility:
+            confirmed.append(run.stage.value)
+        run.inputs = {**run.inputs, "eligibility_confirmed_stages": confirmed}
         await log.write(
             agent=AgentName.ORCHESTRATOR,
             stage=run.stage,

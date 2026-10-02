@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel
-from sqlalchemy import ScalarResult, func, inspect, select
+from sqlalchemy import ScalarResult, func, inspect, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -343,6 +343,15 @@ async def replace_item(
     await _validate_references(session, profile, payload)
     for field, value in payload.model_dump().items():
         setattr(item, field, value)
+    if session.is_modified(item):
+        # Its evidence is embedded with the record's title ("Project: ..."): the stored
+        # vectors describe the old record, so the retrieval index re-embeds them.
+        column = getattr(CandidateEvidence, EVIDENCE_SUBJECT_COLUMNS[spec.evidence_type])
+        await session.execute(
+            update(CandidateEvidence)
+            .where(column == item.id)
+            .values(embedding=None, embedding_model=None, embedded_at=None)
+        )
     await _save(session, commit)
     await session.refresh(item)
     return item_out(spec, item, await _item_evidence(session, spec, profile, item.id))

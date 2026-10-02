@@ -102,7 +102,7 @@ erDiagram
 
 | Table | Purpose | Notable columns and constraints |
 | --- | --- | --- |
-| `users` | Account | `email` unique, must be lowercase. Auth.js tables come in the auth phase |
+| `users` | Account | `email` unique, must be lowercase. Created on first sign-in (see `AUTH_MODE` in deployment.md) |
 | `candidate_profiles` | Master profile, **one per user** (`uq` on `user_id`) | name, headline, summary, contact info, links. Job-search preferences: `preferred_roles` and `preferred_locations` (`text[]`), `work_modes` and `job_types` (`varchar[]`, each element CHECKed against its enum with `<@`), `experience_level` enum |
 | `educations` | Degrees and schooling | `degree_level` enum, `gpa ≤ gpa_scale` (`NUMERIC(5,2)`, so percentage scales work), `end_date ≥ start_date` |
 | `work_experiences` | Jobs, internships, volunteering | `employment_type` enum, a current role cannot have an `end_date` |

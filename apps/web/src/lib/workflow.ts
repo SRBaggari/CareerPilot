@@ -60,7 +60,8 @@ export const WORKFLOW_STEPS: readonly WorkflowStep[] = [
   {
     id: "apply",
     title: "Assisted application",
-    description: "The browser fills forms, then stops before submit and hands control to you.",
+    description:
+      "The browser fills forms and stops before submit; it submits only after you confirm the exact review.",
     humanGate: true,
   },
   {

@@ -79,6 +79,30 @@ describe("AppShell", () => {
     expect(screen.queryByRole("dialog", { name: "Menu" })).toBeNull(); // closes on navigation
   });
 
+  it("keeps focus inside the open menu and returns it however the menu closes", () => {
+    render(<AppShell>page</AppShell>);
+    const open = screen.getByRole("button", { name: "Open menu" });
+    fireEvent.click(open);
+    const menu = screen.getByRole("dialog", { name: "Menu" });
+    const focusable = [...menu.querySelectorAll<HTMLElement>("a[href], button")];
+    const [first, last] = [focusable[0], focusable[focusable.length - 1]];
+    // Tab from the last item wraps to the first, Shift+Tab from the first to the last.
+    last.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(first).toHaveFocus();
+    fireEvent.keyDown(window, { key: "Tab", shiftKey: true });
+    expect(last).toHaveFocus();
+    // The page behind is inert and doesn't scroll while the menu is open.
+    expect(document.getElementById("content")).toHaveAttribute("inert");
+    expect(document.body.style.overflow).toBe("hidden");
+
+    fireEvent.click(within(menu).getByRole("button", { name: "Close menu" }));
+    expect(screen.queryByRole("dialog", { name: "Menu" })).toBeNull();
+    expect(open).toHaveFocus();
+    expect(document.getElementById("content")).not.toHaveAttribute("inert");
+    expect(document.body.style.overflow).toBe("");
+  });
+
   it("offers a skip link to the content", () => {
     render(<AppShell>page</AppShell>);
     expect(screen.getByRole("link", { name: "Skip to content" })).toHaveAttribute(

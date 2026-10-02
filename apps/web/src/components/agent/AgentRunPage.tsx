@@ -52,6 +52,8 @@ function NextStep({ run }: { run: AgentRun }) {
   );
 }
 
+const POLL_MS = 3000;
+
 export function AgentRunPage({ runId }: { runId: string }) {
   const [run, setRun] = useState<AgentRun | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +72,16 @@ export function AgentRunPage({ runId }: { runId: string }) {
     };
   }, [runId]);
 
+  // Another request (or tab) is advancing the run: check back until it stops.
+  const working = run?.status === "running";
+  useEffect(() => {
+    if (!working) return;
+    const timer = window.setInterval(() => {
+      getRun(runId).then(setRun, () => undefined);
+    }, POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [working, runId]);
+
   async function act(call: () => Promise<AgentRun>) {
     setBusy(true);
     setError(null);
@@ -78,6 +90,9 @@ export function AgentRunPage({ runId }: { runId: string }) {
       setConfirmEligibility(false);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Something went wrong. Please try again.");
+      // Show the run as it is now (e.g. another request is already advancing it).
+      const now = await getRun(runId).catch(() => null);
+      if (now) setRun(now);
     } finally {
       setBusy(false);
     }

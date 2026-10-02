@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { WorkflowSteps } from "@/components/WorkflowSteps";
-import { Badge, Card } from "@/components/ui";
+import { Badge, Card, LoadError } from "@/components/ui";
 import { publicConfig } from "@/lib/config";
 import { listSources, type JobSourceStatus } from "@/lib/api/discovery";
 import { getHealth, getReadiness, type Health, type Readiness } from "@/lib/api/health";
@@ -38,6 +38,8 @@ export function SettingsPage() {
   const [health, setHealth] = useState<Health | null | false>(null);
   const [ready, setReady] = useState<Readiness | null | false>(null);
   const [sources, setSources] = useState<JobSourceStatus[] | null>(null);
+  const [sourcesFailure, setSourcesFailure] = useState<unknown>(null);
+  const [sourcesAttempt, setSourcesAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,14 +55,21 @@ export function SettingsPage() {
       (r) => !cancelled && setReady(r),
       () => !cancelled && setReady(false),
     );
-    listSources().then(
-      (s) => !cancelled && setSources(s),
-      () => !cancelled && setSources([]),
-    );
     return () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    listSources().then(
+      (s) => !cancelled && setSources(s),
+      (e: unknown) => !cancelled && setSourcesFailure(e ?? new Error()),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [sourcesAttempt]);
 
   return (
     <main className="mx-auto w-full max-w-4xl flex-1 space-y-6 px-4 py-6 sm:px-6 sm:py-8">
@@ -154,12 +163,24 @@ export function SettingsPage() {
         title="Job sources"
         description="Where job discovery may look. Each source is checked against its access rules."
       >
-        {sources === null ? (
+        {sourcesFailure ? (
+          <LoadError
+            what="job sources"
+            error={sourcesFailure}
+            onRetry={() => {
+              setSourcesFailure(null);
+              setSourcesAttempt((n) => n + 1);
+            }}
+          />
+        ) : sources === null ? (
           <p role="status" className="text-sm text-zinc-500">
             Loading…
           </p>
         ) : sources.length === 0 ? (
-          <p className="text-sm text-zinc-500">No job sources configured.</p>
+          <p className="text-sm text-zinc-500">
+            No job sources are enabled, so discovery and recommendations have nothing to search. Set
+            DISCOVERY_PROVIDERS on the server to enable one.
+          </p>
         ) : (
           <ul className="space-y-2 text-sm" aria-label="Job sources">
             {sources.map((s) => (

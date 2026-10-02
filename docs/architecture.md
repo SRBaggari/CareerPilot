@@ -248,4 +248,4 @@ Unit tests do not require a database or network. DB-backed tests live in
 | 4     | Semantic matching + skill-gap analysis                                |
 | 5     | Tailored resume/cover letter generation with claim verification      |
 | 6     | Approval workflow + application tracking                              |
-| 7     | Playwright-assisted application (stops before submit)                 |
+| 7     | Playwright-assisted application (submits only after you confirm)      |
